@@ -36,3 +36,27 @@ Never merge `preview` – it carries database migrations that releases do not ha
 - Until the first migration of our own, going back to the official images is a change of two variables in
   `plane.env`; after that only by restoring a database backup.
 - **Language:** code comments, documentation and commit messages are in English.
+
+## Project pages API (`/api/v1/.../projects/{id}/pages/`)
+
+Our code is in `apps/api/plane/liviere/api/` (routes included from `apps/api/plane/api/urls/__init__.py`),
+tests in `apps/api/plane/tests/contract/api/test_pages.py`, a compatibility check against `plane-sdk==0.3.1`
+in `apps/api/plane/liviere/scripts/sdk_pages_smoke.py`. The contract follows the SDK: list, retrieve, create,
+`PUT`/`PATCH` (both partial), `POST`/`DELETE .../archive/`, `DELETE` (archived pages only).
+Permissions are the same as in the UI (`ProjectPagePermission`).
+
+**Limitation – content of pages opened in the editor.** The editor works on the Yjs state
+(`description_binary`), which the `live` server stores the first time a page is opened. Replacing
+`description_html` and clearing the binary only works until someone opens the page. After that an open
+editor overwrites the change within ~10 s, and a browser with a cached copy of the page (y-indexeddb) merges
+the old content with the new one – the content gets duplicated and saved to the database (verified on a
+local stack). So the API refuses content changes (409, nothing written) once a page has a
+`description_binary`; the name and other fields can always be changed. Creating pages with content has no
+such limit.
+
+This cannot be solved in the backend alone: force-closing a document via Redis (`hocuspocus:admin`) first
+stores the in-memory state, and after the disconnect the frontend writes the old content back itself;
+`PUBSUB NUMSUB hocuspocus:<id>` does not tell whether a page is open (`@hocuspocus/extension-redis` 2.15.2
+never unsubscribes the channel once the document is unloaded). A full fix needs a change in `apps/live`:
+replacing the content as a regular Yjs edit on the existing document (a new command on `hocuspocus:admin` or
+an endpoint protected by `LIVE_SERVER_SECRET_KEY`).
