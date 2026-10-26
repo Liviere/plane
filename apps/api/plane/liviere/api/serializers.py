@@ -13,6 +13,7 @@ from rest_framework import serializers
 # Module imports
 from plane.api.serializers.base import BaseSerializer
 from plane.db.models import Page, Project, ProjectPage
+from plane.liviere.pages import api_changes_blocked
 from plane.utils.content_validator import validate_html_content
 
 # Fields a client may write; everything else (owner, workspace, archive state,
@@ -43,6 +44,8 @@ class PageSerializer(BaseSerializer):
         allow_null=True,
     )
     projects = serializers.SerializerMethodField()
+    # Set in the app (page menu: Block API changes); when true the API refuses every change
+    api_changes_blocked = serializers.SerializerMethodField()
 
     class Meta:
         model = Page
@@ -61,6 +64,7 @@ class PageSerializer(BaseSerializer):
             "logo_props",
             "external_id",
             "external_source",
+            "api_changes_blocked",
             "created_at",
             "updated_at",
             "created_by",
@@ -79,6 +83,9 @@ class PageSerializer(BaseSerializer):
             "updated_by",
         ]
         extra_kwargs = {"name": {"required": True, "allow_blank": False}}
+
+    def get_api_changes_blocked(self, obj):
+        return api_changes_blocked(obj)
 
     def get_projects(self, obj):
         project_pages = getattr(obj, "active_project_pages", None)
@@ -118,9 +125,10 @@ class PageDetailSerializer(PageSerializer):
     """
     Full page including HTML content, used for create, retrieve and update.
 
-    Writing description_html clears description_binary and description_json:
-    the editor reads the Yjs binary, and the live server rebuilds it from the
-    HTML only when the binary is empty.
+    The editor reads the Yjs binary (description_binary), which the live server
+    rebuilds from description_html only when it is empty. Pages without a binary
+    get their HTML written and the binary stays empty; for pages with a binary the
+    view passes the editor state computed by live (see views.PageDetailAPIEndpoint).
     """
 
     description_html = serializers.CharField(required=False, allow_blank=True)
@@ -160,7 +168,9 @@ class PageDetailSerializer(PageSerializer):
         return page
 
     def update(self, instance, validated_data):
-        if "description_html" in validated_data:
+        # New HTML without an editor state from live: the page has no Yjs document yet, so the live
+        # server rebuilds it from description_html on first open
+        if "description_html" in validated_data and "description_binary" not in validated_data:
             instance.description_binary = None
             instance.description_json = {}
         return super().update(instance, validated_data)

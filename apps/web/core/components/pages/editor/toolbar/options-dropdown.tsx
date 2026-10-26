@@ -14,6 +14,7 @@ import { ToggleSwitch } from "@plane/ui";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { usePageFilters } from "@/hooks/use-page-filters";
 import { useQueryParams } from "@/hooks/use-query-params";
+import { PAGE_API_BLOCK_OPTION_KEY, usePageApiBlockOption } from "@/liviere/use-page-api-block-option";
 // plane web imports
 import type { TPageNavigationPaneTab } from "@/components/pages/navigation-pane/tab-panels";
 import type { EPageStoreType } from "@/hooks/store";
@@ -45,6 +46,8 @@ export const PageOptionsDropdown = observer(function PageOptionsDropdown(props: 
   const { isFullWidth, handleFullWidth, isStickyToolbarEnabled, handleStickyToolbar } = usePageFilters();
   // query params
   const { updateQueryParams } = useQueryParams();
+  // Liviere/plane fork
+  const apiBlockOption = usePageApiBlockOption(page);
   // menu items list
   const EXTRA_MENU_OPTIONS = useMemo(
     function EXTRA_MENU_OPTIONS(): React.ComponentProps<typeof PageActions>["extraOptions"] {
@@ -72,6 +75,7 @@ export const PageOptionsDropdown = observer(function PageOptionsDropdown(props: 
           className: "flex items-center justify-between gap-2",
           shouldRender: isContentEditable,
         },
+        apiBlockOption,
         {
           key: "copy-markdown",
           action: () => {
@@ -117,6 +121,7 @@ export const PageOptionsDropdown = observer(function PageOptionsDropdown(props: 
       handleStickyToolbar,
       isStickyToolbarEnabled,
       isContentEditable,
+      apiBlockOption,
       editorRef,
       updateQueryParams,
       router,
@@ -137,6 +142,7 @@ export const PageOptionsDropdown = observer(function PageOptionsDropdown(props: 
         optionsOrder={[
           "full-screen",
           "sticky-toolbar",
+          PAGE_API_BLOCK_OPTION_KEY,
           "copy-markdown",
           "version-history",
           "make-a-copy",

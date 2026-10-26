@@ -15,8 +15,20 @@ from rest_framework.test import APIClient
 
 from plane.db.models import Page, Project, ProjectMember, ProjectPage, User
 from plane.db.models.api import APIToken
+from plane.liviere import live_client
+from plane.liviere.live_client import LiveUnavailable
+from plane.liviere.pages import API_BLOCK_KEY
 
 VIEWS = "plane.liviere.api.views"
+
+# Yjs state of a page that was opened in the editor, and what the live server returns for an edit
+OPENED_BINARY = b"\x01\x02\x03\x04"
+LIVE_RESULT = {
+    "description_binary": b"\x05\x06\x07\x08",
+    "description_html": '<p class="editor-paragraph-block">New</p>',
+    "description_json": {"type": "doc", "content": [{"type": "paragraph"}]},
+    "update": "dXBkYXRl",
+}
 
 # Keys plane-sdk 0.3.1 requires in a paginated response
 PAGINATION_KEYS = {
@@ -94,6 +106,20 @@ def _make_page(project, owner, access=Page.PUBLIC_ACCESS, **kwargs):
         **kwargs,
     )
     ProjectPage.objects.create(workspace=project.workspace, project=project, page=page)
+    return page
+
+
+@pytest.fixture
+def live_edit():
+    """The live server call; tests of the live path check its arguments."""
+    with patch(f"{VIEWS}.apply_page_edit", return_value=LIVE_RESULT) as mock:
+        yield mock
+
+
+def _opened_page(project, owner, **kwargs):
+    page = _make_page(project, owner, **kwargs)
+    page.description_binary = OPENED_BINARY
+    page.save()
     return page
 
 
@@ -279,10 +305,9 @@ class TestPageDetail:
         assert response.status_code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
 
     @pytest.mark.django_db
-    def test_put_is_partial(self, api_key_client, workspace, project, create_user):
+    def test_put_is_partial(self, api_key_client, workspace, project, create_user, live_edit):
+        # Never opened in the editor: no Yjs binary, so the name is written directly
         page = _make_page(project, create_user, name="Old", description_html="<p>Keep</p>")
-        page.description_binary = b"\x01\x02\x03\x04"
-        page.save()
 
         response = api_key_client.put(_detail_url(workspace, project, page), {"name": "New"}, format="json")
 
@@ -290,7 +315,8 @@ class TestPageDetail:
         page.refresh_from_db()
         assert page.name == "New"
         assert page.description_html == "<p>Keep</p>"
-        assert bytes(page.description_binary) == b"\x01\x02\x03\x04"
+        assert page.description_binary is None
+        live_edit.assert_not_called()
 
     @pytest.mark.parametrize("method", ["put", "patch"])
     @pytest.mark.django_db
@@ -321,24 +347,70 @@ class TestPageDetail:
 
     @pytest.mark.parametrize("method", ["put", "patch"])
     @pytest.mark.django_db
-    def test_content_update_refused_after_page_was_opened(
-        self, method, api_key_client, workspace, project, create_user
+    def test_opened_page_is_edited_through_live(
+        self, method, api_key_client, workspace, project, create_user, live_edit, django_capture_on_commit_callbacks
     ):
-        # live stores description_binary on first open; rewriting the HTML then would be
-        # overwritten by an open editor or duplicated by a browser's cached document
-        page = _make_page(project, create_user, name="Old", description_html="<p>Old</p>")
-        page.description_binary = b"\x01\x02\x03\x04"
-        page.save()
+        page = _opened_page(project, create_user, name="Old", description_html="<p>Old</p>")
 
-        response = getattr(api_key_client, method)(
-            _detail_url(workspace, project, page), {"name": "New", "description_html": "<p>New</p>"}, format="json"
-        )
+        with (
+            patch(f"{VIEWS}.page_transaction") as mock_transaction,
+            patch(f"{VIEWS}.track_page_version") as mock_version,
+            patch(f"{VIEWS}.publish_page_update") as mock_publish,
+        ):
+            with django_capture_on_commit_callbacks(execute=True):
+                response = getattr(api_key_client, method)(
+                    _detail_url(workspace, project, page),
+                    {"name": "New", "description_html": "<p>New</p><script>x</script>"},
+                    format="json",
+                )
 
-        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.status_code == status.HTTP_200_OK
+        # live gets the stored binary and the sanitized HTML
+        args, kwargs = live_edit.call_args
+        assert args == (page.id, OPENED_BINARY)
+        assert kwargs == {"description_html": "<p>New</p>", "name": "New"}
+        # the state computed by live is stored in one write, never a cleared binary
+        page.refresh_from_db()
+        assert page.name == "New"
+        assert bytes(page.description_binary) == LIVE_RESULT["description_binary"]
+        assert page.description_html == LIVE_RESULT["description_html"]
+        assert page.description_json == LIVE_RESULT["description_json"]
+        mock_publish.assert_called_once_with(page.id, LIVE_RESULT["update"])
+        mock_transaction.delay.assert_called_once()
+        mock_version.delay.assert_called_once()
+
+    @pytest.mark.django_db
+    def test_opened_page_rename_updates_the_title_through_live(
+        self, api_key_client, workspace, project, create_user, live_edit
+    ):
+        page = _opened_page(project, create_user, name="Old", description_html="<p>Body</p>")
+
+        with patch(f"{VIEWS}.publish_page_update"):
+            response = api_key_client.put(_detail_url(workspace, project, page), {"name": "Renamed"}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert live_edit.call_args.kwargs == {"description_html": None, "name": "Renamed"}
+        page.refresh_from_db()
+        assert page.name == "Renamed"
+        assert page.description_html == "<p>Body</p>"
+        assert bytes(page.description_binary) == LIVE_RESULT["description_binary"]
+
+    @pytest.mark.django_db
+    def test_nothing_written_when_live_is_unavailable(self, api_key_client, workspace, project, create_user, live_edit):
+        page = _opened_page(project, create_user, name="Old", description_html="<p>Old</p>")
+        live_edit.side_effect = LiveUnavailable("down")
+
+        with patch(f"{VIEWS}.publish_page_update") as mock_publish:
+            response = api_key_client.put(
+                _detail_url(workspace, project, page), {"name": "New", "description_html": "<p>New</p>"}, format="json"
+            )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         page.refresh_from_db()
         assert page.name == "Old"
         assert page.description_html == "<p>Old</p>"
-        assert bytes(page.description_binary) == b"\x01\x02\x03\x04"
+        assert bytes(page.description_binary) == OPENED_BINARY
+        mock_publish.assert_not_called()
 
     @pytest.mark.django_db
     def test_unchanged_content_keeps_editor_state(self, api_key_client, workspace, project, create_user):
@@ -361,10 +433,26 @@ class TestPageDetail:
         response = api_key_client.put(_detail_url(workspace, project, page), {"name": "New"}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+        # Unlocking is done in the app only
         response = api_key_client.patch(_detail_url(workspace, project, page), {"is_locked": False}, format="json")
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        page.refresh_from_db()
+        assert page.is_locked is True
+
+    @pytest.mark.django_db
+    def test_api_key_cannot_change_is_locked(self, api_key_client, workspace, project, create_user):
+        page = _make_page(project, create_user)
+
+        response = api_key_client.patch(_detail_url(workspace, project, page), {"is_locked": True}, format="json")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
         page.refresh_from_db()
         assert page.is_locked is False
+
+        # Sending the current value is not a change
+        response = api_key_client.patch(
+            _detail_url(workspace, project, page), {"is_locked": False, "name": "Renamed"}, format="json"
+        )
+        assert response.status_code == status.HTTP_200_OK
 
     @pytest.mark.django_db
     def test_archived_page_refused(self, api_key_client, workspace, project, create_user):
@@ -477,3 +565,156 @@ class TestPageArchive:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         page.refresh_from_db()
         assert page.archived_at is None
+
+
+def _block_url(workspace, project, page):
+    return f"/api/workspaces/{workspace.slug}/projects/{project.id}/pages/{page.id}/liviere/api-block/"
+
+
+def _block(page):
+    page.view_props = {**page.view_props, API_BLOCK_KEY: True}
+    page.save()
+    return page
+
+
+@pytest.mark.contract
+class TestApiChangesBlocked:
+    @pytest.mark.django_db
+    def test_writes_refused_reads_allowed(self, api_key_client, workspace, project, create_user, live_edit):
+        page = _block(_opened_page(project, create_user, name="Old", description_html="<p>Old</p>"))
+
+        response = api_key_client.put(
+            _detail_url(workspace, project, page), {"name": "New", "description_html": "<p>New</p>"}, format="json"
+        )
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert "Block API changes" in response.data["error"]
+        assert api_key_client.post(_archive_url(workspace, project, page)).status_code == status.HTTP_409_CONFLICT
+        live_edit.assert_not_called()
+
+        page.refresh_from_db()
+        assert (page.name, page.description_html, page.archived_at) == ("Old", "<p>Old</p>", None)
+
+        response = api_key_client.get(_detail_url(workspace, project, page))
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["api_changes_blocked"] is True
+
+    @pytest.mark.django_db
+    def test_unarchive_and_delete_refused(self, api_key_client, workspace, project, create_user):
+        page = _block(_make_page(project, create_user, archived_at=timezone.now().date()))
+
+        assert api_key_client.delete(_archive_url(workspace, project, page)).status_code == status.HTTP_409_CONFLICT
+        assert api_key_client.delete(_detail_url(workspace, project, page)).status_code == status.HTTP_409_CONFLICT
+        assert Page.objects.filter(pk=page.id, archived_at__isnull=False).exists()
+
+    @pytest.mark.django_db
+    def test_flag_off_by_default(self, api_key_client, workspace, project, create_user):
+        page = _make_page(project, create_user)
+        response = api_key_client.get(_detail_url(workspace, project, page))
+        assert response.data["api_changes_blocked"] is False
+
+
+@pytest.mark.contract
+class TestApiBlockToggle:
+    @pytest.mark.django_db
+    def test_owner_toggles_in_the_app(self, session_client, workspace, project, create_user):
+        page = _make_page(project, create_user)
+        page.view_props = {"full_width": True}
+        page.save()
+
+        response = session_client.post(_block_url(workspace, project, page))
+        assert response.status_code == status.HTTP_200_OK
+        page.refresh_from_db()
+        assert page.view_props == {"full_width": True, API_BLOCK_KEY: True}
+
+        response = session_client.delete(_block_url(workspace, project, page))
+        assert response.status_code == status.HTTP_200_OK
+        page.refresh_from_db()
+        assert page.view_props == {"full_width": True, API_BLOCK_KEY: False}
+
+    @pytest.mark.django_db
+    def test_admin_toggles_page_of_another_member(self, session_client, workspace, project, other_user):
+        ProjectMember.objects.create(project=project, member=other_user, role=15, is_active=True)
+        page = _make_page(project, other_user)
+
+        assert session_client.post(_block_url(workspace, project, page)).status_code == status.HTTP_200_OK
+
+    @pytest.mark.django_db
+    def test_member_cannot_toggle_page_of_another_user(self, workspace, project, create_user, other_user):
+        ProjectMember.objects.create(project=project, member=other_user, role=15, is_active=True)
+        page = _make_page(project, create_user)
+        client = APIClient()
+        client.force_login(other_user)
+
+        assert client.post(_block_url(workspace, project, page)).status_code == status.HTTP_403_FORBIDDEN
+        page.refresh_from_db()
+        assert API_BLOCK_KEY not in page.view_props
+
+    @pytest.mark.django_db
+    def test_api_key_cannot_reach_the_toggle(self, api_key_client, workspace, project, create_user):
+        page = _block(_make_page(project, create_user))
+
+        response = api_key_client.delete(_block_url(workspace, project, page))
+
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
+        page.refresh_from_db()
+        assert page.view_props[API_BLOCK_KEY] is True
+
+
+@pytest.mark.unit
+class TestLiveClient:
+    def test_apply_page_edit_request_and_response(self, monkeypatch):
+        monkeypatch.setenv("LIVE_SERVER_SECRET_KEY", "test-secret")
+        response = patch.object(live_client.requests, "post").start()
+        response.return_value.status_code = 200
+        response.return_value.json.return_value = {
+            "description_binary": "BQYHCA==",
+            "description_html": "<p>x</p>",
+            "description_json": {"type": "doc"},
+            "update": "dXBk",
+        }
+        try:
+            result = live_client.apply_page_edit("page-1", OPENED_BINARY, name="Renamed")
+        finally:
+            patch.stopall()
+
+        url = response.call_args.args[0]
+        assert url.endswith("/liviere/page-edit/")
+        assert response.call_args.kwargs["headers"] == {"live-server-secret-key": "test-secret"}
+        assert response.call_args.kwargs["json"] == {
+            "page_id": "page-1",
+            "description_binary": "AQIDBA==",
+            "name": "Renamed",
+        }
+        assert response.call_args.kwargs["timeout"] == live_client.TIMEOUT_SECONDS
+        assert result["description_binary"] == b"\x05\x06\x07\x08"
+
+    def test_unavailable_without_secret_or_on_error(self, monkeypatch):
+        monkeypatch.delenv("LIVE_SERVER_SECRET_KEY", raising=False)
+        with pytest.raises(LiveUnavailable):
+            live_client.apply_page_edit("page-1", OPENED_BINARY, name="x")
+
+        monkeypatch.setenv("LIVE_SERVER_SECRET_KEY", "test-secret")
+        with patch.object(live_client.requests, "post", side_effect=live_client.requests.ConnectionError()):
+            with pytest.raises(LiveUnavailable):
+                live_client.apply_page_edit("page-1", OPENED_BINARY, name="x")
+        with patch.object(live_client.requests, "post") as post:
+            post.return_value.status_code = 500
+            with pytest.raises(LiveUnavailable):
+                live_client.apply_page_edit("page-1", OPENED_BINARY, name="x")
+
+
+@pytest.mark.unit
+class TestPageVersionTask:
+    @pytest.mark.django_db
+    def test_version_recorded_after_a_content_change(self, project, create_user):
+        # In v1.4.2 the task read Page.description (no such field) and silently recorded nothing
+        from plane.bgtasks.page_version_task import track_page_version
+        from plane.db.models import PageVersion
+
+        page = _make_page(project, create_user, description_html="<p>New</p>", description_json={"type": "doc"})
+
+        track_page_version(str(page.id), '{"description_html": "<p>Old</p>"}', str(create_user.id))
+
+        version = PageVersion.objects.get(page=page)
+        assert version.description_html == "<p>New</p>"
+        assert version.description_json == {"type": "doc"}
