@@ -5,7 +5,8 @@
 # Project pages in the public API (/api/v1), following the contract of plane-sdk 0.3.1.
 # Based on makeplane/plane#9528 (RemoYukoff); guest scoping and content reset from #9774
 # (rclod), the archived-page check from #8865 (nprodromou). Semantics mirror
-# plane/app/views/page/base.py (PageViewSet, PagesDescriptionViewSet).
+# plane/app/views/page/base.py (PageViewSet, PagesDescriptionViewSet). Content and title of pages
+# opened in the editor change through the live server (plane/liviere/live_client.py).
 
 # Python imports
 import json
@@ -17,7 +18,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 
 # Third party imports
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 
 # Module imports
@@ -27,6 +28,9 @@ from plane.app.views.page.base import unarchive_archive_page_and_descendants
 from plane.bgtasks.page_transaction_task import page_transaction
 from plane.bgtasks.page_version_task import track_page_version
 from plane.db.models import Page, Project, ProjectMember, ProjectPage, UserFavorite, UserRecentVisit
+from plane.liviere.live_client import LiveUnavailable, apply_page_edit, publish_page_update
+from plane.liviere.pages import api_changes_blocked, api_changes_blocked_response, is_owner_or_admin
+from plane.utils.exception_logger import log_exception
 
 from .serializers import WRITABLE_FIELDS, PageDetailSerializer, PageSerializer
 
@@ -60,15 +64,6 @@ def project_pages(slug, project_id, user):
         if not project.guest_view_all_features:
             queryset = queryset.filter(owned_by=user)
     return queryset
-
-
-def is_owner_or_admin(request, page, project_id):
-    return (
-        page.owned_by_id == request.user.id
-        or ProjectMember.objects.filter(
-            project_id=project_id, member=request.user, is_active=True, role=ROLE.ADMIN.value
-        ).exists()
-    )
 
 
 def external_id_conflict(slug, project_id, external_id, external_source, exclude_id=None):
@@ -160,14 +155,23 @@ class PageDetailAPIEndpoint(BaseAPIView):
 
     def patch(self, request, slug, project_id, page_id):
         page = project_pages(slug, project_id, request.user).get(pk=page_id)
+        if api_changes_blocked(page):
+            return api_changes_blocked_response()
         data = {key: value for key, value in request.data.items() if key in WRITABLE_FIELDS}
 
         if page.archived_at:
             return Response({"error": "Archived page cannot be edited"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # A locked page can only be unlocked (the internal unlock has the same permissions)
-        if page.is_locked and set(data) - {"is_locked"}:
+        if page.is_locked:
             return Response({"error": "Page is locked"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Locking and unlocking is done in the app only; an API key may set is_locked when creating a page
+        if "is_locked" in data:
+            try:
+                requested_lock = serializers.BooleanField().to_internal_value(data.pop("is_locked"))
+            except serializers.ValidationError:
+                return Response({"is_locked": ["Must be a valid boolean."]}, status=status.HTTP_400_BAD_REQUEST)
+            if requested_lock != page.is_locked:
+                return Response({"error": "is_locked can only be changed in the app"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = PageDetailSerializer(
             page,
@@ -199,29 +203,48 @@ class PageDetailAPIEndpoint(BaseAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-        # Unchanged content is not a content write: keep the editor state as it is
+        # Unchanged values are not writes: keep the editor state as it is
         if validated.get("description_html") == page.description_html:
             validated.pop("description_html")
+        if validated.get("name") == page.name:
+            validated.pop("name")
 
         old_description_html = page.description_html
         content_changed = "description_html" in validated
-
-        # The live server stores the Yjs state (description_binary) as soon as a page is opened
-        # in the editor. Once it exists, replacing the HTML and clearing the binary is not safe:
-        # an open editor stores its state over the change, and a browser with the page cached
-        # (y-indexeddb) merges its old document with the one rebuilt from HTML, duplicating the
-        # content. So content can only be written until the page is first opened.
-        if content_changed and page.description_binary:
-            return Response(
-                {
-                    "error": "The page has been opened in the editor; its content can only be changed "
-                    "there. Nothing was written."
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
+        name_changed = "name" in validated
+        live_update = None
 
         with transaction.atomic():
-            page = serializer.save()
+            # Serialize writes to the page while live computes the edit
+            serializer.instance = Page.objects.select_for_update().get(pk=page.id)
+            if (content_changed or name_changed) and serializer.instance.description_binary:
+                # The page has a Yjs document (it was opened in the editor): content and title change as a
+                # Yjs edit on that document, never by rebuilding it from HTML. Live applies the edit (to the
+                # open document if there is one) and returns the result; it is stored here in one write.
+                try:
+                    edited = apply_page_edit(
+                        page.id,
+                        serializer.instance.description_binary,
+                        description_html=validated["description_html"] if content_changed else None,
+                        name=validated["name"] if name_changed else None,
+                    )
+                except LiveUnavailable as e:
+                    log_exception(e)
+                    return Response(
+                        {"error": "The collaboration server is unavailable. Nothing was written, retry later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                editor_state = {
+                    "description_binary": edited["description_binary"],
+                    "description_json": edited["description_json"],
+                }
+                if content_changed:
+                    editor_state["description_html"] = edited["description_html"]
+                page = serializer.save(**editor_state)
+                live_update = edited["update"]
+            else:
+                page = serializer.save()
+
             if content_changed:
                 existing_instance = json.dumps({"description_html": old_description_html}, cls=DjangoJSONEncoder)
                 new_description_html = page.description_html
@@ -239,12 +262,16 @@ class PageDetailAPIEndpoint(BaseAPIView):
                         ),
                     )
                 )
+            if live_update:
+                transaction.on_commit(lambda: publish_page_update(page_id, live_update))
 
         page = project_pages(slug, project_id, request.user).get(pk=page_id)
         return Response(PageDetailSerializer(page).data, status=status.HTTP_200_OK)
 
     def delete(self, request, slug, project_id, page_id):
         page = project_pages(slug, project_id, request.user).get(pk=page_id)
+        if api_changes_blocked(page):
+            return api_changes_blocked_response()
 
         if page.archived_at is None:
             return Response(
@@ -289,6 +316,8 @@ class PageArchiveUnarchiveAPIEndpoint(BaseAPIView):
 
     def post(self, request, slug, project_id, page_id):
         page = project_pages(slug, project_id, request.user).get(pk=page_id)
+        if api_changes_blocked(page):
+            return api_changes_blocked_response()
         if not is_owner_or_admin(request, page, project_id):
             return Response(
                 {"error": "Only the owner or admin can archive the page"},
@@ -307,6 +336,8 @@ class PageArchiveUnarchiveAPIEndpoint(BaseAPIView):
 
     def delete(self, request, slug, project_id, page_id):
         page = project_pages(slug, project_id, request.user).get(pk=page_id)
+        if api_changes_blocked(page):
+            return api_changes_blocked_response()
         if not is_owner_or_admin(request, page, project_id):
             return Response(
                 {"error": "Only the owner or admin can unarchive the page"},

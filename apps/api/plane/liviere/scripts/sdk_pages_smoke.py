@@ -14,15 +14,20 @@ plane-mcp-server 0.3.3). Runs outside Django, against a running instance:
 Sequence: list -> create -> retrieve -> update -> [editor check] -> archive ->
 unarchive -> archive -> delete -> retrieve (expects 404).
 
+Then, for a page that was opened in the editor (needs the editor check): create ->
+open in the editor -> update content and name -> open again (new content and title,
+no duplicates) -> wait SMOKE_SETTLE_SECONDS (default 30) -> name and content still new.
+
 The editor check is optional: if SMOKE_EDITOR_CHECK is set, it is run as a shell
-command with PAGE_ID and EXPECTED_TEXT in the environment and must exit with 0
-(for example a headless browser that opens the page and reads the editor).
+command with PAGE_ID, EXPECTED_TEXT and EXPECTED_TITLE in the environment and must
+exit with 0 (for example a headless browser that opens the page and reads the editor).
 Never put keys in this file; everything comes from the environment.
 """
 
 import os
 import subprocess
 import sys
+import time
 import uuid
 
 from plane import PlaneClient
@@ -80,16 +85,8 @@ def main():
     )
     assert updated.description_html == f"<p>{new_text}</p>", updated.description_html
 
-    editor_check = os.environ.get("SMOKE_EDITOR_CHECK")
-    if editor_check:
-        env = {**os.environ, "PAGE_ID": str(page_id), "EXPECTED_TEXT": new_text}
-        result = subprocess.run(editor_check, shell=True, env=env)
-        if result.returncode != 0:
-            print(f"FAIL editor check (exit {result.returncode})")
-            sys.exit(1)
+    if editor_check(page_id, new_text):
         print("OK   editor shows the content written through the API")
-    else:
-        print("SKIP editor check (SMOKE_EDITOR_CHECK not set)")
 
     step("archive", lambda: pages.archive_project_page(slug, project_id, page_id))
     archived = pages.retrieve_project_page(slug, project_id, page_id)
@@ -104,10 +101,67 @@ def main():
     except HttpError as e:
         if e.status_code in (403, 404):
             print(f"OK   retrieve after delete -> HTTP {e.status_code}")
-            return
-        raise
-    print("FAIL page still retrievable after delete")
-    sys.exit(1)
+        else:
+            raise
+    else:
+        print("FAIL page still retrievable after delete")
+        sys.exit(1)
+
+    opened_page(pages, slug, project_id, marker)
+
+
+def editor_check(page_id, text, title=None):
+    """Runs SMOKE_EDITOR_CHECK; returns False when it is not configured, exits on failure."""
+    command = os.environ.get("SMOKE_EDITOR_CHECK")
+    if not command:
+        print("SKIP editor check (SMOKE_EDITOR_CHECK not set)")
+        return False
+    env = {**os.environ, "PAGE_ID": str(page_id), "EXPECTED_TEXT": text, "EXPECTED_TITLE": title or ""}
+    result = subprocess.run(command, shell=True, env=env)
+    if result.returncode != 0:
+        print(f"FAIL editor check (exit {result.returncode})")
+        sys.exit(1)
+    return True
+
+
+def opened_page(pages, slug, project_id, marker):
+    """A page that was opened in the editor: content and title change as a Yjs edit through live."""
+    first_text = f"Opened page {marker}"
+    page = step(
+        "create (opened page)",
+        lambda: pages.create_project_page(
+            slug, project_id, data=CreatePage(name=f"Opened {marker}", description_html=f"<p>{first_text}</p>")
+        ),
+    )
+    if not editor_check(page.id, first_text, f"Opened {marker}"):
+        print("SKIP opened page scenario (needs the editor check)")
+        return
+    print("OK   page opened in the editor (it now has a Yjs document)")
+
+    new_text, new_name = f"Changed after opening {marker}", f"Renamed {marker}"
+    updated = step(
+        "update content and name of the opened page (PUT)",
+        lambda: pages.update_project_page(
+            slug, project_id, page.id, data=UpdatePage(name=new_name, description_html=f"<p>{new_text}</p>")
+        ),
+    )
+    assert updated.name == new_name and new_text in updated.description_html, updated
+    editor_check(page.id, new_text, new_name)
+    print("OK   editor shows the new content and title")
+
+    settle = int(os.environ.get("SMOKE_SETTLE_SECONDS", "30"))
+    time.sleep(settle)
+    stored = pages.retrieve_project_page(slug, project_id, page.id)
+    if stored.name != new_name or new_text not in stored.description_html:
+        print(f"FAIL after {settle} s: name={stored.name!r} html={stored.description_html!r}")
+        sys.exit(1)
+    if stored.description_html.count(new_text) != 1 or first_text in stored.description_html:
+        print(f"FAIL duplicated or stale content: {stored.description_html!r}")
+        sys.exit(1)
+    print(f"OK   after {settle} s the stored name and content are still the new ones")
+
+    step("archive (opened page)", lambda: pages.archive_project_page(slug, project_id, page.id))
+    step("delete (opened page)", lambda: pages.delete_project_page(slug, project_id, page.id))
 
 
 if __name__ == "__main__":

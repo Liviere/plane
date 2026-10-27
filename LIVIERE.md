@@ -31,32 +31,53 @@ Never merge `preview` – it carries database migrations that releases do not ha
 - **Database:** our own models live in a separate Django app (`apps/api/plane/liviere/`) with its own
   migrations. Do not add files to `apps/api/plane/db/migrations/` (numbering clashes with upstream). Instead of
   altering official tables, add separate tables linked 1:1 or by a foreign key.
-- **Frontend:** new code in separate files, hook points in the `ce/` layers (e.g. `apps/web/ce/`); change as
-  few lines as possible in official files.
+- **Our code** goes to `liviere` directories next to the official code (`apps/api/plane/liviere/`,
+  `apps/live/src/liviere/`, `apps/web/core/liviere/`); official files only get hook points (a few lines, marked
+  `Liviere/plane fork`). Upstream removed the `apps/web/ce/` layer in v1.4 (#9245); its leftover stubs in
+  `core/` (e.g. `core/store/pages/extended-base-page.ts`, `packages/types/src/page/extended.ts`) are the
+  intended extension points.
 - Until the first migration of our own, going back to the official images is a change of two variables in
   `plane.env`; after that only by restoring a database backup.
 - **Language:** code comments, documentation and commit messages are in English.
 
 ## Project pages API (`/api/v1/.../projects/{id}/pages/`)
 
-Our code is in `apps/api/plane/liviere/api/` (routes included from `apps/api/plane/api/urls/__init__.py`),
-tests in `apps/api/plane/tests/contract/api/test_pages.py`, a compatibility check against `plane-sdk==0.3.1`
-in `apps/api/plane/liviere/scripts/sdk_pages_smoke.py`. The contract follows the SDK: list, retrieve, create,
+Our code is in `apps/api/plane/liviere/` (`api/` public API, `app/` app endpoints, `live_client.py`),
+`apps/live/src/liviere/` and `apps/web/core/liviere/`. Tests: `apps/api/plane/tests/contract/api/test_pages.py`,
+`apps/live/tests/liviere/`; compatibility check against `plane-sdk==0.3.1`:
+`apps/api/plane/liviere/scripts/sdk_pages_smoke.py`. The contract follows the SDK: list, retrieve, create,
 `PUT`/`PATCH` (both partial), `POST`/`DELETE .../archive/`, `DELETE` (archived pages only).
 Permissions are the same as in the UI (`ProjectPagePermission`).
 
-**Limitation – content of pages opened in the editor.** The editor works on the Yjs state
-(`description_binary`), which the `live` server stores the first time a page is opened. Replacing
-`description_html` and clearing the binary only works until someone opens the page. After that an open
-editor overwrites the change within ~10 s, and a browser with a cached copy of the page (y-indexeddb) merges
-the old content with the new one – the content gets duplicated and saved to the database (verified on a
-local stack). So the API refuses content changes (409, nothing written) once a page has a
-`description_binary`; the name and other fields can always be changed. Creating pages with content has no
-such limit.
+**Content and title of a page opened in the editor.** The editor works on the Yjs document
+(`description_binary`, fragments `default` and `title`) that the `live` server stores when a page is first
+opened. Once it exists, the API never rebuilds it from HTML (an open editor would overwrite the change and a
+browser's y-indexeddb copy would duplicate the content). Instead:
 
-This cannot be solved in the backend alone: force-closing a document via Redis (`hocuspocus:admin`) first
-stores the in-memory state, and after the disconnect the frontend writes the old content back itself;
-`PUBSUB NUMSUB hocuspocus:<id>` does not tell whether a page is open (`@hocuspocus/extension-redis` 2.15.2
-never unsubscribes the channel once the document is unloaded). A full fix needs a change in `apps/live`:
-replacing the content as a regular Yjs edit on the existing document (a new command on `hocuspocus:admin` or
-an endpoint protected by `LIVE_SERVER_SECRET_KEY`).
+1. Django locks the page row and sends the stored binary and the change to `live`
+   (`POST /live/liviere/page-edit/`, header `live-server-secret-key` = `LIVE_SERVER_SECRET_KEY`).
+2. `live` computes the change against the stored document with `updateYFragment` (y-prosemirror): only the
+   nodes that differ are changed, so unchanged paragraphs keep their Yjs items. If the page is open, the
+   change is merged into the in-memory document as a CRDT update – editors see it immediately and text a person
+   typed but `live` has not stored yet is kept. `live` returns the resulting binary, HTML and JSON.
+3. Django stores binary, HTML, JSON and `name` in one write, then asks `live` to replay the update on a document
+   opened in the meantime and on other `live` instances (`POST /live/liviere/page-edit/publish/`, Redis channel
+   `hocuspocus:<page id>`).
+
+If `live` cannot be reached, the API answers 503 and writes nothing. Pages without a binary (never opened) get
+their HTML written directly; `live` builds the document from it on first open. `live` is found at
+`settings.LIVE_URL`, else `LIVIERE_LIVE_URL`, else `http://live:3000/live/` (service name in the compose files).
+
+The API replaces the whole content: text that is already stored but missing from the HTML sent by the client is
+removed. Version history keeps the previous content (`track_page_version`; its v1.4.2 bug – it read the
+non-existent `Page.description` and silently saved nothing – is fixed in this fork).
+
+**Block API changes.** Page menu (•••) → *Block API changes*, available to the page owner and project admins
+(`POST`/`DELETE /api/workspaces/.../pages/{id}/liviere/api-block/`, session only – API keys cannot reach it).
+Stored as `view_props.liviere_block_api`; the app does not write page `view_props` (full width and sticky
+toolbar are browser-local), but a project member sending a crafted app `PATCH` with `view_props` could
+overwrite it. When on, every change through the API (update, archive, unarchive, delete) answers 409 and writes
+nothing; reading works and returns `api_changes_blocked: true`.
+
+**Locking.** `is_locked` can be set when creating a page through the API; locking and unlocking afterwards is
+done in the app only (403 through the API). A locked page refuses every change through the API.
