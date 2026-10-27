@@ -2,6 +2,8 @@
   "liviere": {
     "activity": {
       "title": "Activity",
+      "view_grid": "Grid",
+      "view_log": "Work log",
       "range_days": "{days} days",
       "all_members": "All members",
       "summary": "{active} active quarters ≈ {hours} h · {events} actions",
@@ -116,7 +118,10 @@
         "save_error": "Couldn't save the entry. Try again.",
         "delete_title": "Delete log entry",
         "delete_confirm": "The entry will be deleted permanently. This can't be undone.",
-        "delete_error": "Couldn't delete the entry. Try again."
+        "delete_error": "Couldn't delete the entry. Try again.",
+        "day_summary": "{count, plural, one {# entry} other {# entries}} · {duration}",
+        "empty_title": "No log entries in this range",
+        "empty_description": "Log entries say what was done and when. Add them here, or let AI agents write them through the API or the plane-log script."
       }
     }
   }

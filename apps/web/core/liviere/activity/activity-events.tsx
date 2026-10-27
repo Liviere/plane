@@ -4,20 +4,18 @@
  * See the LICENSE file for details.
  */
 
-// Liviere/plane fork: actions of one heatmap quarter, with links to what they changed. Log entries show
-// their text and time range; their author and project admins can change or delete them.
+// Liviere/plane fork: actions of one heatmap quarter, with links to what they changed (rows:
+// activity-event-row.tsx).
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
 import useSWR from "swr";
-import { Pencil, Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
-import { Avatar, Loader } from "@plane/ui";
-import { cn, getFileURL } from "@plane/utils";
+import { Loader } from "@plane/ui";
 import { projectActivityService } from "./activity.service";
 import type { TSelectedBucket } from "./activity-root";
+import { ActivityEventRow } from "./activity-event-row";
 import { slotBounds, slotRange } from "./grid";
-import { ACTIVITY_LOG_SOURCE } from "./types";
 import type { TActivityEvent, TActivityQuery } from "./types";
 
 type Props = {
@@ -31,32 +29,6 @@ type Props = {
   onEdit: (event: TActivityEvent) => void;
   onDelete: (event: TActivityEvent) => void;
 };
-
-const OBJECT_PATHS: Record<string, string> = { cycle: "cycles", module: "modules", view: "views" };
-
-function eventTarget(event: TActivityEvent, workspaceSlug: string, projectId: string) {
-  if (event.issue) {
-    const label = [event.issue.identifier, event.issue.name].filter(Boolean).join(" ");
-    const href = event.issue.identifier ? `/${workspaceSlug}/browse/${event.issue.identifier}/` : null;
-    return { label, href, deleted: event.issue.deleted };
-  }
-  if (event.page) {
-    return {
-      label: event.page.name,
-      href: `/${workspaceSlug}/projects/${projectId}/pages/${event.page.id}`,
-      deleted: event.page.deleted,
-    };
-  }
-  if (event.object) {
-    const path = OBJECT_PATHS[event.source];
-    return {
-      label: event.object.name,
-      href: path ? `/${workspaceSlug}/projects/${projectId}/${path}/${event.object.id}` : null,
-      deleted: event.object.deleted,
-    };
-  }
-  return null;
-}
 
 export function ActivityEventList(props: Props) {
   const { workspaceSlug, projectId, query, selected, locale, onClose, canChange, onEdit, onDelete } = props;
@@ -109,63 +81,19 @@ export function ActivityEventList(props: Props) {
         <p className="text-13 text-tertiary">{t("liviere.activity.no_activity")}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {data.results.map((event) => {
-            const target = eventTarget(event, workspaceSlug, projectId);
-            return (
-              <li key={event.id} className="flex flex-col gap-1 text-13">
-                <div className="flex items-center gap-2">
-                  <span className={cn("shrink-0 text-tertiary", timeWidth)}>
-                    {time.format(new Date(event.occurred_at))}
-                    {event.ended_at && `–${time.format(new Date(event.ended_at))}`}
-                  </span>
-                  {event.actor ? (
-                    <Avatar name={event.actor.display_name} src={getFileURL(event.actor.avatar_url ?? "")} size="sm" />
-                  ) : null}
-                  <span className="shrink-0 text-secondary">{event.actor?.display_name ?? "—"}</span>
-                  <span className="shrink-0 text-primary">{t(`liviere.activity.kinds.${event.kind}`)}</span>
-                  {target && (
-                    <span className="min-w-0 truncate text-tertiary">
-                      {target.href && !target.deleted ? (
-                        <Link href={target.href} className="hover:text-primary hover:underline">
-                          {target.label || t("liviere.activity.untitled")}
-                        </Link>
-                      ) : (
-                        <span className="line-through">{target.label || t("liviere.activity.deleted")}</span>
-                      )}
-                    </span>
-                  )}
-                  {event.source === ACTIVITY_LOG_SOURCE && canChange(event) && (
-                    <span className="ml-auto flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(event)}
-                        aria-label={t("edit")}
-                        className="rounded-sm p-1 text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(event)}
-                        aria-label={t("delete")}
-                        className="rounded-sm p-1 text-tertiary hover:bg-layer-transparent-hover hover:text-danger-primary"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </span>
-                  )}
-                </div>
-                {event.note && (
-                  <div className="flex gap-2">
-                    <span className={cn("shrink-0", timeWidth)} />
-                    <p className="min-w-0 border-l-2 border-subtle pl-3 break-words whitespace-pre-wrap text-secondary">
-                      {event.note}
-                    </p>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {data.results.map((event) => (
+            <ActivityEventRow
+              key={event.id}
+              event={event}
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              time={time}
+              timeWidth={timeWidth}
+              canChange={canChange}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
           {data.next_page_results && (
             <li className="text-12 text-tertiary">{t("liviere.activity.more_events", { count: data.total_count })}</li>
           )}
