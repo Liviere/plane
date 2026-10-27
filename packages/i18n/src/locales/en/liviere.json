@@ -34,7 +34,8 @@
         "issues": "Work items",
         "pages": "Pages",
         "cycles_modules": "Cycles and modules",
-        "views": "Views"
+        "views": "Views",
+        "log": "Work log"
       },
       "kinds": {
         "issue": {
@@ -64,6 +65,9 @@
         },
         "view": {
           "changed": "View created or changed"
+        },
+        "log": {
+          "entry": "Log entry"
         }
       },
       "kind_descriptions": {
@@ -94,7 +98,25 @@
         },
         "view": {
           "changed": "Creating or editing a view of this project."
+        },
+        "log": {
+          "entry": "Notes of what people and AI agents did, added on the Activity page or through the API. An entry fills every quarter of its time range."
         }
+      },
+      "log": {
+        "add": "Add entry",
+        "add_title": "New log entry",
+        "edit_title": "Edit log entry",
+        "date": "Date",
+        "from": "From",
+        "to": "To (optional)",
+        "text": "What was done",
+        "text_placeholder": "For example: fixed the redirect after sign-in and deployed it to staging.",
+        "issue": "Work item (optional)",
+        "save_error": "Couldn't save the entry. Try again.",
+        "delete_title": "Delete log entry",
+        "delete_confirm": "The entry will be deleted permanently. This can't be undone.",
+        "delete_error": "Couldn't delete the entry. Try again."
       }
     }
   }

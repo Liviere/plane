@@ -4,18 +4,20 @@
  * See the LICENSE file for details.
  */
 
-// Liviere/plane fork: actions of one heatmap quarter, with links to what they changed.
+// Liviere/plane fork: actions of one heatmap quarter, with links to what they changed. Log entries show
+// their text and time range; their author and project admins can change or delete them.
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { Avatar, Loader } from "@plane/ui";
-import { getFileURL } from "@plane/utils";
+import { cn, getFileURL } from "@plane/utils";
 import { projectActivityService } from "./activity.service";
 import type { TSelectedBucket } from "./activity-root";
 import { slotBounds, slotRange } from "./grid";
+import { ACTIVITY_LOG_SOURCE } from "./types";
 import type { TActivityEvent, TActivityQuery } from "./types";
 
 type Props = {
@@ -25,6 +27,9 @@ type Props = {
   selected: TSelectedBucket;
   locale: string;
   onClose: () => void;
+  canChange: (event: TActivityEvent) => boolean;
+  onEdit: (event: TActivityEvent) => void;
+  onDelete: (event: TActivityEvent) => void;
 };
 
 const OBJECT_PATHS: Record<string, string> = { cycle: "cycles", module: "modules", view: "views" };
@@ -54,7 +59,7 @@ function eventTarget(event: TActivityEvent, workspaceSlug: string, projectId: st
 }
 
 export function ActivityEventList(props: Props) {
-  const { workspaceSlug, projectId, query, selected, locale, onClose } = props;
+  const { workspaceSlug, projectId, query, selected, locale, onClose, canChange, onEdit, onDelete } = props;
   const { t } = useTranslation();
   const { start, end } = slotBounds(selected.date, selected.slot);
   const { data, error, isLoading } = useSWR(
@@ -75,6 +80,8 @@ export function ActivityEventList(props: Props) {
     sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selected.date, selected.slot]);
   const day = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" });
+  // One time column for all rows; wider when log entries show a range
+  const timeWidth = data?.results.some((event) => event.ended_at) ? "w-24" : "w-12";
 
   return (
     <section ref={sectionRef} className="rounded-md border border-subtle bg-layer-1 p-4">
@@ -105,23 +112,56 @@ export function ActivityEventList(props: Props) {
           {data.results.map((event) => {
             const target = eventTarget(event, workspaceSlug, projectId);
             return (
-              <li key={event.id} className="flex items-center gap-2 text-13">
-                <span className="w-12 shrink-0 text-tertiary">{time.format(new Date(event.occurred_at))}</span>
-                {event.actor ? (
-                  <Avatar name={event.actor.display_name} src={getFileURL(event.actor.avatar_url ?? "")} size="sm" />
-                ) : null}
-                <span className="shrink-0 text-secondary">{event.actor?.display_name ?? "—"}</span>
-                <span className="shrink-0 text-primary">{t(`liviere.activity.kinds.${event.kind}`)}</span>
-                {target && (
-                  <span className="min-w-0 truncate text-tertiary">
-                    {target.href && !target.deleted ? (
-                      <Link href={target.href} className="hover:text-primary hover:underline">
-                        {target.label || t("liviere.activity.untitled")}
-                      </Link>
-                    ) : (
-                      <span className="line-through">{target.label || t("liviere.activity.deleted")}</span>
-                    )}
+              <li key={event.id} className="flex flex-col gap-1 text-13">
+                <div className="flex items-center gap-2">
+                  <span className={cn("shrink-0 text-tertiary", timeWidth)}>
+                    {time.format(new Date(event.occurred_at))}
+                    {event.ended_at && `–${time.format(new Date(event.ended_at))}`}
                   </span>
+                  {event.actor ? (
+                    <Avatar name={event.actor.display_name} src={getFileURL(event.actor.avatar_url ?? "")} size="sm" />
+                  ) : null}
+                  <span className="shrink-0 text-secondary">{event.actor?.display_name ?? "—"}</span>
+                  <span className="shrink-0 text-primary">{t(`liviere.activity.kinds.${event.kind}`)}</span>
+                  {target && (
+                    <span className="min-w-0 truncate text-tertiary">
+                      {target.href && !target.deleted ? (
+                        <Link href={target.href} className="hover:text-primary hover:underline">
+                          {target.label || t("liviere.activity.untitled")}
+                        </Link>
+                      ) : (
+                        <span className="line-through">{target.label || t("liviere.activity.deleted")}</span>
+                      )}
+                    </span>
+                  )}
+                  {event.source === ACTIVITY_LOG_SOURCE && canChange(event) && (
+                    <span className="ml-auto flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(event)}
+                        aria-label={t("edit")}
+                        className="rounded-sm p-1 text-tertiary hover:bg-layer-transparent-hover hover:text-primary"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(event)}
+                        aria-label={t("delete")}
+                        className="rounded-sm p-1 text-tertiary hover:bg-layer-transparent-hover hover:text-danger-primary"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+                {event.note && (
+                  <div className="flex gap-2">
+                    <span className={cn("shrink-0", timeWidth)} />
+                    <p className="min-w-0 border-l-2 border-subtle pl-3 break-words whitespace-pre-wrap text-secondary">
+                      {event.note}
+                    </p>
+                  </div>
                 )}
               </li>
             );

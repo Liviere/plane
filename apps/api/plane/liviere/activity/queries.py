@@ -6,11 +6,11 @@
 # app endpoints (plane/liviere/app) and the public API (plane/liviere/api).
 
 # Python imports
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Django imports
-from django.db.models import Count, IntegerField
+from django.db.models import Count, IntegerField, Q
 from django.db.models.functions import Cast, ExtractMinute, Floor, TruncHour
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -76,10 +76,13 @@ def parse_params(request, project_id):
 
 
 def filtered_events(project_id, query, since=None, until=None):
+    """Events in the window; log entries with a time range count when the range overlaps it."""
+    since = since or query["since"]
+    until = until or query["until"]
     events = ActivityEvent.objects.filter(
+        Q(occurred_at__gte=since, occurred_at__lt=until)
+        | Q(ended_at__isnull=False, occurred_at__lt=until, ended_at__gt=since),
         project_id=project_id,
-        occurred_at__gte=since or query["since"],
-        occurred_at__lt=until or query["until"],
         kind__in=query["kinds"],
     )
     if query["actor"]:
@@ -87,15 +90,28 @@ def filtered_events(project_id, query, since=None, until=None):
     return events
 
 
+def _range_quarters(start, end, query):
+    """Starts of the 15-minute quarters covered by [start, end), clipped to the query window."""
+    start = max(start, query["since"]).astimezone(dt_timezone.utc)
+    end = min(end, query["until"])
+    # Time zone offsets are whole quarters, so UTC quarters are local quarters too
+    quarter = start.replace(minute=start.minute - start.minute % BUCKET_MINUTES, second=0, microsecond=0)
+    while quarter < end:
+        yield quarter
+        quarter += timedelta(minutes=BUCKET_MINUTES)
+
+
 def heatmap(project_id, query):
     """
     Events counted per 15 minutes of local time. Buckets are sparse: only quarters with events, each with
     its local date, slot (0-95 from midnight) and counts per kind. On the day clocks go back, both copies
-    of the repeated hour fall into the same slots.
+    of the repeated hour fall into the same slots. A log entry with a time range counts once in every
+    quarter it covers and once in the summary.
     """
     zone = query["zone"]
+    events = filtered_events(project_id, query)
     rows = (
-        filtered_events(project_id, query)
+        events.filter(ended_at__isnull=True)
         .annotate(
             local_hour=TruncHour("occurred_at", tzinfo=zone),
             quarter=Cast(Floor(ExtractMinute("occurred_at", tzinfo=zone) / BUCKET_MINUTES), IntegerField()),
@@ -106,21 +122,35 @@ def heatmap(project_id, query):
 
     buckets = {}
     totals = {}
-    for row in rows:
-        local_hour = row["local_hour"].astimezone(zone)
-        key = (local_hour.date(), local_hour.hour * 4 + row["quarter"])
+
+    def add(local_start, kind, count):
+        key = (local_start.date(), local_start.hour * 4 + local_start.minute // BUCKET_MINUTES)
         bucket = buckets.get(key)
         if bucket is None:
             bucket = buckets[key] = {
                 "date": key[0].isoformat(),
                 "slot": key[1],
-                "start": local_hour.replace(minute=row["quarter"] * BUCKET_MINUTES).isoformat(),
+                "start": local_start.isoformat(),
                 "count": 0,
                 "by_kind": {},
             }
-        bucket["count"] += row["count"]
-        bucket["by_kind"][row["kind"]] = bucket["by_kind"].get(row["kind"], 0) + row["count"]
+        bucket["count"] += count
+        bucket["by_kind"][kind] = bucket["by_kind"].get(kind, 0) + count
+
+    for row in rows:
+        local_hour = row["local_hour"].astimezone(zone)
+        add(local_hour.replace(minute=row["quarter"] * BUCKET_MINUTES), row["kind"], row["count"])
         totals[row["kind"]] = totals.get(row["kind"], 0) + row["count"]
+
+    for entry in events.filter(ended_at__isnull=False).values("occurred_at", "ended_at", "kind"):
+        # Once per local quarter, also in the repeated hour when clocks go back
+        slots = {}
+        for quarter in _range_quarters(entry["occurred_at"], entry["ended_at"], query):
+            local_start = quarter.astimezone(zone)
+            slots.setdefault((local_start.date(), local_start.hour, local_start.minute), local_start)
+        for local_start in slots.values():
+            add(local_start, entry["kind"], 1)
+        totals[entry["kind"]] = totals.get(entry["kind"], 0) + 1
 
     active = len(buckets)
     return {
@@ -210,6 +240,9 @@ def serialize_events(events):
             "issue": issue_ref(e.issue_id) if e.issue_id else None,
             "page": named_ref(pages, e.page_id) if e.page_id else None,
             "object": named_ref(objects, e.object_id) if e.object_id else None,
+            "ended_at": e.ended_at.isoformat() if e.ended_at else None,
+            "note": e.note,
+            "updated_at": e.updated_at.isoformat() if e.updated_at else None,
         }
         for e in events
     ]

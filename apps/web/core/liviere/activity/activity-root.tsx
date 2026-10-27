@@ -5,18 +5,27 @@
  */
 
 // Liviere/plane fork: the "Activity" page of a project. Rows are days (newest on top), columns are the
-// 96 quarters of the day; the colour says how many actions happened in that quarter.
+// 96 quarters of the day; the colour says how many actions happened in that quarter. Admins and members
+// add log entries here (what they did, from when to when); agents do it through the API.
 
 import { useMemo, useState } from "react";
 import { observer } from "mobx-react";
+import { Plus } from "lucide-react";
+import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { Loader } from "@plane/ui";
+import { Button } from "@plane/propel/button";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { AlertModalCore, Loader } from "@plane/ui";
 import { cn } from "@plane/utils";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
+import { projectActivityService } from "./activity.service";
 import { ActivityEventList } from "./activity-events";
 import { ActivityGrid } from "./activity-grid";
+import { ActivityLogModal } from "./activity-log-modal";
 import { shiftDate, todayIn } from "./grid";
-import { useActivityHeatmap } from "./use-activity";
+import type { TActivityEvent } from "./types";
+import { refreshProjectActivity, useActivityHeatmap } from "./use-activity";
 
 const RANGES = [7, 30, 90];
 
@@ -35,6 +44,28 @@ export const ProjectActivityRoot = observer(function ProjectActivityRoot(props: 
   const [days, setDays] = useState(30);
   const [actor, setActor] = useState<string | null>(null);
   const [selected, setSelected] = useState<TSelectedBucket | null>(null);
+  // Log entry dialog: null closed, {} new entry, {entry} change
+  const [logDialog, setLogDialog] = useState<{ entry?: TActivityEvent } | null>(null);
+  const [deleting, setDeleting] = useState<TActivityEvent | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { data: currentUser } = useUser();
+  const { allowPermissions } = useUserPermissions();
+  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug, projectId);
+  const canChange = (event: TActivityEvent) => isAdmin || (!!currentUser && event.actor?.id === currentUser.id);
+
+  const deleteEntry = async () => {
+    if (!deleting) return;
+    setIsDeleting(true);
+    try {
+      await projectActivityService.deleteLog(workspaceSlug, projectId, deleting.id);
+      await refreshProjectActivity(projectId);
+      setDeleting(null);
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: t("error"), message: t("liviere.activity.log.delete_error") });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const to = todayIn(timeZone);
   const query = { from: shiftDate(to, -(days - 1)), to, tz: timeZone, actor };
@@ -85,8 +116,17 @@ export const ProjectActivityRoot = observer(function ProjectActivityRoot(props: 
             {t("liviere.activity.all_members")}
           </button>
         )}
+        <Button
+          variant="secondary"
+          size="sm"
+          prependIcon={<Plus />}
+          onClick={() => setLogDialog({})}
+          className="ml-auto"
+        >
+          {t("liviere.activity.log.add")}
+        </Button>
         {heatmap && (
-          <span className="ml-auto text-13 text-secondary">
+          <span className="text-13 text-secondary">
             {t("liviere.activity.summary", {
               active: heatmap.summary.active_buckets,
               hours: heatmap.summary.active_hours.toLocaleString(currentLocale, { maximumFractionDigits: 2 }),
@@ -118,8 +158,31 @@ export const ProjectActivityRoot = observer(function ProjectActivityRoot(props: 
           selected={selected}
           locale={currentLocale}
           onClose={() => setSelected(null)}
+          canChange={canChange}
+          onEdit={(entry) => setLogDialog({ entry })}
+          onDelete={setDeleting}
         />
       )}
+
+      {logDialog && (
+        <ActivityLogModal
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          entry={logDialog.entry}
+          bucket={selected}
+          onClose={() => setLogDialog(null)}
+        />
+      )}
+      <AlertModalCore
+        isOpen={!!deleting}
+        handleClose={() => setDeleting(null)}
+        handleSubmit={() => void deleteEntry()}
+        isSubmitting={isDeleting}
+        title={t("liviere.activity.log.delete_title")}
+        content={t("liviere.activity.log.delete_confirm")}
+        primaryButtonText={{ loading: t("deleting"), default: t("delete") }}
+        secondaryButtonText={t("cancel")}
+      />
     </div>
   );
 });

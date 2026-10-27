@@ -7,7 +7,7 @@
 // Liviere/plane fork: data hooks of the project activity heatmap.
 
 import { useCallback } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { EUserPermissions } from "@plane/constants";
 import type { TNavigationItem } from "@/components/navigation/tab-navigation-root";
 import { projectActivityService } from "./activity.service";
@@ -58,4 +58,13 @@ export const useActivityHeatmap = (workspaceSlug: string, projectId: string, que
     `LIVIERE_ACTIVITY_HEATMAP_${projectId}_${query.from}_${query.to}_${query.tz}_${query.actor ?? ""}`,
     () => projectActivityService.getHeatmap(workspaceSlug, projectId, query),
     { refreshInterval: 60_000, keepPreviousData: true }
+  );
+
+/** Reloads the heatmap and the event lists of a project, e.g. after a log entry changed. */
+export const refreshProjectActivity = (projectId: string) =>
+  mutate(
+    (key) =>
+      typeof key === "string" &&
+      (key.startsWith(`LIVIERE_ACTIVITY_HEATMAP_${projectId}_`) ||
+        key.startsWith(`LIVIERE_ACTIVITY_EVENTS_${projectId}_`))
   );

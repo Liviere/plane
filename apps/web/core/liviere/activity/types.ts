@@ -41,6 +41,10 @@ export type TActivityEvent = {
   issue: (TActivityRef & { identifier: string | null }) | null;
   page: TActivityRef | null;
   object: TActivityRef | null;
+  // Log entries only (source "log"): end of the time range and the text
+  ended_at: string | null;
+  note: string | null;
+  updated_at: string | null;
 };
 
 export type TActivityEventsPage = {
@@ -54,6 +58,15 @@ export type TActivitySettings = {
   enabled: boolean;
   kinds: string[];
   catalog: { group: string; kinds: { key: string; default: boolean }[] }[];
+};
+
+export const ACTIVITY_LOG_SOURCE = "log";
+
+export type TActivityLogInput = {
+  text: string;
+  started_at: string;
+  ended_at: string | null;
+  issue: string | null;
 };
 
 export type TActivityQuery = {

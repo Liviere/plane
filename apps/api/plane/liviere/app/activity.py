@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-# Project activity heatmap for the web app (session authentication). See plane/liviere/activity.
+# Project activity heatmap and log entries for the web app (session authentication). See
+# plane/liviere/activity.
 
 # Third party imports
 from rest_framework import status
@@ -52,3 +53,27 @@ class ActivityEnabledProjectsEndpoint(BaseAPIView):
             "project_id", flat=True
         )
         return Response({"project_ids": [str(project_id) for project_id in enabled]}, status=status.HTTP_200_OK)
+
+
+class ProjectActivityLogsEndpoint(ActivityHandlers, BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def get(self, request, slug, project_id):
+        return self.list_logs(request, project_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def post(self, request, slug, project_id):
+        return self.create_log(request, slug, project_id)
+
+
+class ProjectActivityLogDetailEndpoint(ActivityHandlers, BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def get(self, request, slug, project_id, log_id):
+        return self.get_log(request, project_id, log_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def patch(self, request, slug, project_id, log_id):
+        return self.patch_log(request, slug, project_id, log_id)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    def delete(self, request, slug, project_id, log_id):
+        return self.delete_log(request, slug, project_id, log_id)

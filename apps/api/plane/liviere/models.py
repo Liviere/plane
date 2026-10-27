@@ -25,6 +25,8 @@ class ActivityEvent(models.Model):
     SOURCE_CYCLE = "cycle"
     SOURCE_MODULE = "module"
     SOURCE_VIEW = "view"
+    # Activity log entry written by a person or an AI agent (plane/liviere/activity/logs.py)
+    SOURCE_LOG = "log"
 
     id = models.BigAutoField(primary_key=True)
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="+")
@@ -39,7 +41,11 @@ class ActivityEvent(models.Model):
     issue_id = models.UUIDField(null=True)
     page_id = models.UUIDField(null=True)
     object_id = models.UUIDField(null=True)
+    # Log entries only: end of the time range (occurred_at is its start) and the text
+    ended_at = models.DateTimeField(null=True)
+    note = models.TextField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True)
 
     class Meta:
         db_table = "liviere_activity_events"
@@ -53,6 +59,11 @@ class ActivityEvent(models.Model):
         indexes = [
             models.Index(fields=["project", "occurred_at"], name="liviere_act_project_time"),
             models.Index(fields=["project", "actor", "occurred_at"], name="liviere_act_project_actor"),
+            models.Index(
+                fields=["project", "ended_at"],
+                condition=models.Q(ended_at__isnull=False),
+                name="liviere_act_project_range",
+            ),
         ]
 
 

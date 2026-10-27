@@ -10,6 +10,8 @@ from .activity import (
     ActivityEnabledProjectsEndpoint,
     ProjectActivityEventsEndpoint,
     ProjectActivityHeatmapEndpoint,
+    ProjectActivityLogDetailEndpoint,
+    ProjectActivityLogsEndpoint,
     ProjectActivitySettingsEndpoint,
 )
 from .views import PageApiBlockEndpoint
@@ -34,6 +36,16 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/liviere/activity/settings/",
         ProjectActivitySettingsEndpoint.as_view(http_method_names=["get", "patch"]),
         name="liviere-project-activity-settings",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/liviere/activity/logs/",
+        ProjectActivityLogsEndpoint.as_view(http_method_names=["get", "post"]),
+        name="liviere-project-activity-logs",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/liviere/activity/logs/<int:log_id>/",
+        ProjectActivityLogDetailEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="liviere-project-activity-log-detail",
     ),
     path(
         "workspaces/<str:slug>/liviere/activity/enabled-projects/",

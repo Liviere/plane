@@ -23,6 +23,7 @@ PAGE_ARCHIVE = "page.archive"
 CYCLE_CHANGED = "cycle.changed"
 MODULE_CHANGED = "module.changed"
 VIEW_CHANGED = "view.changed"
+LOG_ENTRY = "log.entry"
 
 # (group, [(key, counted by default)])
 CATALOG = [
@@ -45,6 +46,7 @@ CATALOG = [
     ("pages", [(PAGE_CREATED, True), (PAGE_EDITED, True), (PAGE_RENAMED, True), (PAGE_ARCHIVE, True)]),
     ("cycles_modules", [(CYCLE_CHANGED, True), (MODULE_CHANGED, True)]),
     ("views", [(VIEW_CHANGED, False)]),
+    ("log", [(LOG_ENTRY, True)]),
 ]
 
 ALL_KINDS = [key for _, kinds in CATALOG for key, _ in kinds]

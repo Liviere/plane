@@ -114,7 +114,7 @@ Code: `apps/api/plane/liviere/activity/` (catalog, recording, queries), `liviere
 
 **Catalog** (`activity/kinds.py`; off by default: reactions/votes, views): work item created, state, property,
 description, comment, link/attachment, relation/sub-item, cycle/module membership, archive/delete, intake;
-page created, edited, renamed, archived/deleted; cycle changed, module changed; view changed.
+page created, edited, renamed, archived/deleted; cycle changed, module changed; view changed; log entry.
 
 **Settings** – Project settings → Features → Activity (project admins): *Enable Activity* (shows the item in
 the project navigation; events are recorded either way) and the counted actions. Stored in
@@ -133,6 +133,32 @@ project time zone), `actor` (user id), `kinds` (comma-separated, default the pro
 takes `start`/`end` (ISO date-times, e.g. one quarter). On the day clocks go back, both copies of the repeated
 hour fall into the same slots. The settings change only in the app
 (`PATCH /api/workspaces/.../projects/{id}/liviere/activity/settings/`, project admin).
+
+### Activity log (`/api/v1/.../projects/{id}/activity/logs/`)
+
+What a person or an AI agent did and when, for work that leaves no other trace in Plane (code, servers,
+research). An entry is an `ActivityEvent` with `source="log"`, `kind="log.entry"`, the text in `note`, the start
+in `occurred_at` and an optional end in `ended_at`; it counts once in every quarter of its range and once in the
+summary. Rules in `activity/logs.py`; migration `0003` adds the columns and `log.entry` to saved settings.
+
+| Endpoint | |
+|---|---|
+| `GET .../activity/logs/` | entries (same parameters and format as `events/`, whatever kinds the project counts) |
+| `POST .../activity/logs/` | new entry → 201 |
+| `GET/PATCH/DELETE .../activity/logs/{id}/` | one entry |
+
+Body: `text` (required, ≤ 4000 characters); time as `started_at` + `ended_at`, `started_at` +
+`duration_minutes`, only `duration_minutes` (ends now) or only `started_at`/nothing (a moment, one quarter);
+ISO date-times, without an offset in the project time zone; at most 12 h, not in the future. Optional `issue`
+(UUID or identifier such as `ORD-12`) and `page` (UUID), both of this project. Admins and members write; the
+author or a project admin changes and deletes (hard delete). A `PATCH` with a new start keeps the length. The
+same endpoints exist for the app under `/api/workspaces/.../projects/{id}/liviere/activity/logs/`; the
+*Activity* page has *Add entry* and edit/delete in the list of a quarter.
+
+**`liviere/tools/plane-log`** – a command-line client for agents (Python standard library only). It reads the
+token from `~/.config/plane-mcp/env`, like the Plane MCP setup, and takes project identifiers:
+`plane-log add -p ORD --minutes 40 --issue ORD-12 "…"`, `plane-log list -p ORD --date … [--at HH:MM --events]`,
+`plane-log edit`/`rm`. The `plane-mcp-server` package does not know these endpoints.
 
 **Disabling the sync** (e.g. before going back to images without our code, where the worker would log an unknown
 task): `docker compose exec api python manage.py shell -c "from django_celery_beat.models import PeriodicTask;

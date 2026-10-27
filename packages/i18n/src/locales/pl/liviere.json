@@ -34,7 +34,8 @@
         "issues": "Elementy pracy",
         "pages": "Strony",
         "cycles_modules": "Cykle i moduły",
-        "views": "Widoki"
+        "views": "Widoki",
+        "log": "Dziennik pracy"
       },
       "kinds": {
         "issue": {
@@ -64,6 +65,9 @@
         },
         "view": {
           "changed": "Utworzenie lub zmiana widoku"
+        },
+        "log": {
+          "entry": "Wpis dziennika"
         }
       },
       "kind_descriptions": {
@@ -94,7 +98,25 @@
         },
         "view": {
           "changed": "Utworzenie lub edycja widoku tego projektu."
+        },
+        "log": {
+          "entry": "Notatki o tym, co zrobili ludzie i agenci AI, dodane na stronie Aktywność lub przez API. Wpis zaznacza wszystkie kwadranse swojego przedziału czasu."
         }
+      },
+      "log": {
+        "add": "Dodaj wpis",
+        "add_title": "Nowy wpis dziennika",
+        "edit_title": "Edycja wpisu dziennika",
+        "date": "Data",
+        "from": "Od",
+        "to": "Do (opcjonalnie)",
+        "text": "Co zostało zrobione",
+        "text_placeholder": "Na przykład: naprawiono przekierowanie po zalogowaniu i wdrożono je na staging.",
+        "issue": "Element pracy (opcjonalnie)",
+        "save_error": "Nie udało się zapisać wpisu. Spróbuj ponownie.",
+        "delete_title": "Usuń wpis dziennika",
+        "delete_confirm": "Wpis zostanie trwale usunięty. Tej operacji nie można cofnąć.",
+        "delete_error": "Nie udało się usunąć wpisu. Spróbuj ponownie."
       }
     }
   }
