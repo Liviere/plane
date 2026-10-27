@@ -36,8 +36,12 @@ Never merge `preview` – it carries database migrations that releases do not ha
   `Liviere/plane fork`). Upstream removed the `apps/web/ce/` layer in v1.4 (#9245); its leftover stubs in
   `core/` (e.g. `core/store/pages/extended-base-page.ts`, `packages/types/src/page/extended.ts`) are the
   intended extension points.
-- Until the first migration of our own, going back to the official images is a change of two variables in
-  `plane.env`; after that only by restoring a database backup.
+- Our app `plane.liviere` (`apps.py`, registered in `INSTALLED_APPS`) holds our models, migrations
+  (`plane/liviere/migrations/`), signals and Celery tasks (`plane/liviere/tasks.py`, found by autodiscovery).
+  Periodic tasks are scheduled by `django_celery_beat` rows created in our migrations, not in `plane/celery.py`.
+- Going back to the official images: our migrations only add tables, which the official code ignores, so a
+  change of `PLANE_IMAGE_REPO`/`APP_RELEASE` still works; disable our periodic tasks first (see the feature
+  sections). Removing our tables needs `manage.py migrate liviere zero` on a fork image.
 - **Language:** code comments, documentation and commit messages are in English.
 
 ## Project pages API (`/api/v1/.../projects/{id}/pages/`)
@@ -81,3 +85,56 @@ nothing; reading works and returns `api_changes_blocked: true`.
 
 **Locking.** `is_locked` can be set when creating a page through the API; locking and unlocking afterwards is
 done in the app only (403 through the API). A locked page refuses every change through the API.
+
+## Project activity (`/api/v1/.../projects/{id}/activity/`)
+
+A per-project heatmap of when work happens, like GitHub contributions but finer: rows are days, columns are the
+96 quarters of the day, the colour says how many actions happened in that quarter. It also gives an approximate
+time (quarters with any activity × 15 min) – not logged working time.
+
+Code: `apps/api/plane/liviere/activity/` (catalog, recording, queries), `liviere/models.py`
+(`ActivityEvent`, `ProjectActivitySettings`), `liviere/app/activity.py` and `liviere/api/activity.py`
+(endpoints), `apps/web/core/liviere/activity/` (page, settings, sidebar item), i18n namespace `liviere`
+(`packages/i18n/src/locales/*/liviere.json`; only `en` and `pl` are translated). Tests:
+`apps/api/plane/tests/contract/api/test_activity.py`.
+
+**Recording.** Every action becomes an `ActivityEvent` (project, actor, time, kind, object):
+
+- Work items: copied from `IssueActivity`, the history Plane keeps anyway, by the Celery task
+  `plane.liviere.tasks.sync_issue_activity_events` every minute (django_celery_beat row
+  `liviere: sync issue activity to activity events`). Each run takes rows updated since the last copy minus
+  10 minutes and skips what it already has (`source_id` is unique), so it is idempotent and needs no change to
+  the upstream activity task. Migration `0002` copies the whole existing history once.
+- Pages, cycles, modules, views have no history table; Django signals record them (`activity/signals.py`).
+  The actor comes from `crum` (the request user, also for API keys and for page content stored by `live`
+  with the editor's cookie); saves without a user (background tasks) are skipped. Page content edits count at
+  most once a minute per person and page (`live` stores an open page every ~10 s). Page archive/unarchive run
+  raw SQL, so `PageViewSet.archive/unarchive` and our API call `record_page_archive` (hook in
+  `plane/app/views/page/base.py`).
+
+**Catalog** (`activity/kinds.py`; off by default: reactions/votes, views): work item created, state, property,
+description, comment, link/attachment, relation/sub-item, cycle/module membership, archive/delete, intake;
+page created, edited, renamed, archived/deleted; cycle changed, module changed; view changed.
+
+**Settings** – Project settings → Features → Activity (project admins): *Enable Activity* (shows the item in
+the project navigation; events are recorded either way) and the counted actions. Stored in
+`ProjectActivitySettings`; the choice of actions applies at read time, so also to the past.
+
+**API.** Project admins and members (not guests – events name work items a guest may not see):
+
+| Endpoint | |
+|---|---|
+| `GET .../activity/heatmap/` | sparse buckets `[{date, slot (0-95), start, count, by_kind}]` + `summary` (`events`, `active_buckets`, `active_hours`, `by_kind`) |
+| `GET .../activity/events/` | the actions, newest first, with actor and referenced work item/page/cycle/module/view (paginated like other v1 lists) |
+| `GET .../activity/settings/` | `enabled`, counted `kinds`, `catalog` |
+
+Parameters: `from`, `to` (local dates, default the last 30 days, at most 366), `tz` (IANA name, default the
+project time zone), `actor` (user id), `kinds` (comma-separated, default the project setting); `events` also
+takes `start`/`end` (ISO date-times, e.g. one quarter). On the day clocks go back, both copies of the repeated
+hour fall into the same slots. The settings change only in the app
+(`PATCH /api/workspaces/.../projects/{id}/liviere/activity/settings/`, project admin).
+
+**Disabling the sync** (e.g. before going back to images without our code, where the worker would log an unknown
+task): `docker compose exec api python manage.py shell -c "from django_celery_beat.models import PeriodicTask;
+PeriodicTask.objects.filter(name__startswith='liviere:').update(enabled=False)"`.
+

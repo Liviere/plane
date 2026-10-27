@@ -27,6 +27,7 @@ export type TProjectSettingsTabs =
   | "features_views"
   | "features_pages"
   | "features_intake"
+  | "features_activity" // Liviere/plane fork
   | "states"
   | "labels"
   | "estimates"

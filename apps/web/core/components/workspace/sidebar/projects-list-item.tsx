@@ -42,6 +42,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 import { HIGHLIGHT_CLASS, highlightIssueOnDrop } from "../../issues/issue-layouts/utils";
 import { ProjectNavigation } from "./project-navigation";
 import { useNavigationItems } from "@/components/navigation/use-navigation-items";
+import { useActivityNavigationItems } from "@/liviere/activity/use-activity"; // Liviere/plane fork
 
 type Props = {
   projectId: string;
@@ -103,6 +104,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
     allowPermissions,
   });
   const availableTabKeys = navigationItems.map((item) => item.key);
+  const liviereNavigation = useActivityNavigationItems(workspaceSlug.toString()); // Liviere/plane fork
 
   // Get preferences from hook
   const { tabPreferences } = useTabPreferences(workspaceSlug.toString(), projectId);
@@ -480,7 +482,11 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
               {isProjectListOpen && (
                 <Disclosure.Panel as="div" className="relative mt-1 mb-1.5 flex flex-col gap-0.5 pl-6">
                   <div className="absolute top-0 bottom-1 left-[15px] w-[1px] bg-layer-3" />
-                  <ProjectNavigation workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
+                  <ProjectNavigation
+                    workspaceSlug={workspaceSlug.toString()}
+                    projectId={projectId.toString()}
+                    additionalNavigationItems={liviereNavigation} // Liviere/plane fork
+                  />
                 </Disclosure.Panel>
               )}
             </Transition>
