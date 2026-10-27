@@ -4,11 +4,19 @@
  * See the LICENSE file for details.
  */
 
-// Liviere/plane fork: app endpoints of the project activity heatmap (apps/api/plane/liviere/app/activity.py).
+// Liviere/plane fork: app endpoints of the project activity heatmap and log entries
+// (apps/api/plane/liviere/app/activity.py).
 
 import { API_BASE_URL } from "@plane/constants";
 import { APIService } from "@/services/api.service";
-import type { TActivityEventsPage, TActivityHeatmap, TActivityQuery, TActivitySettings } from "./types";
+import type {
+  TActivityEvent,
+  TActivityEventsPage,
+  TActivityHeatmap,
+  TActivityLogInput,
+  TActivityQuery,
+  TActivitySettings,
+} from "./types";
 
 export class ProjectActivityService extends APIService {
   constructor() {
@@ -60,6 +68,35 @@ export class ProjectActivityService extends APIService {
   ): Promise<TActivitySettings> {
     return this.patch(this.projectUrl(workspaceSlug, projectId, "settings"), data)
       .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createLog(workspaceSlug: string, projectId: string, data: TActivityLogInput): Promise<TActivityEvent> {
+    return this.post(this.projectUrl(workspaceSlug, projectId, "logs"), data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateLog(
+    workspaceSlug: string,
+    projectId: string,
+    logId: number,
+    data: Partial<TActivityLogInput>
+  ): Promise<TActivityEvent> {
+    return this.patch(`${this.projectUrl(workspaceSlug, projectId, "logs")}${logId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteLog(workspaceSlug: string, projectId: string, logId: number): Promise<void> {
+    return this.delete(`${this.projectUrl(workspaceSlug, projectId, "logs")}${logId}/`)
+      .then(() => undefined)
       .catch((error) => {
         throw error?.response?.data;
       });

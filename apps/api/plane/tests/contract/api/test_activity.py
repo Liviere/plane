@@ -3,7 +3,7 @@
 # See the LICENSE file for details.
 
 # Project activity heatmap (fork Liviere/plane, plane/liviere/activity): recording, aggregation and the
-# endpoints in /api/ (session) and /api/v1/ (API key).
+# endpoints in /api/ (session) and /api/v1/ (API key), including log entries.
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 from uuid import uuid4
@@ -14,7 +14,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Cycle, IssueActivity, Module, Page, Project, ProjectMember, ProjectPage, User
+from plane.db.models import Cycle, Issue, IssueActivity, Module, Page, Project, ProjectMember, ProjectPage, User
 from plane.db.models.api import APIToken
 from plane.liviere.activity import kinds as K
 from plane.liviere.activity.kinds import DEFAULT_KINDS, kind_for_issue_activity, parse_kinds
@@ -407,3 +407,226 @@ class TestRecordingThroughEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
         assert [(e.kind, e.actor_id) for e in _events(project)] == [(K.PAGE_ARCHIVE, create_user.id)]
+
+
+def _log(project, actor, start, end=None, text="Did things"):
+    return _event(project, actor, start, kind=K.LOG_ENTRY, source=ActivityEvent.SOURCE_LOG, ended_at=end, note=text)
+
+
+@pytest.mark.contract
+class TestLogEntries:
+    @pytest.mark.django_db
+    def test_create_with_a_range_and_a_work_item_identifier(self, api_key_client, workspace, project, create_user):
+        issue = Issue.objects.create(name="Fix login", project=project, workspace=workspace)
+        body = {
+            "text": "  Fixed the login redirect and deployed it.  ",
+            "started_at": "2026-07-01T10:05:00+02:00",
+            "ended_at": "2026-07-01T10:50:00+02:00",
+            "issue": f"ap-{issue.sequence_id}",
+        }
+
+        response = api_key_client.post(_v1(workspace, project, "logs"), body, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["kind"] == K.LOG_ENTRY
+        assert data["note"] == "Fixed the login redirect and deployed it."
+        assert data["occurred_at"] == "2026-07-01T08:05:00+00:00"
+        assert data["ended_at"] == "2026-07-01T08:50:00+00:00"
+        assert data["issue"]["identifier"] == f"AP-{issue.sequence_id}"
+        assert data["actor"]["id"] == str(create_user.id)
+        entry = ActivityEvent.objects.get(id=data["id"])
+        assert (entry.source, entry.issue_id, entry.workspace_id) == (ActivityEvent.SOURCE_LOG, issue.id, workspace.id)
+
+    @pytest.mark.django_db
+    def test_time_forms(self, api_key_client, workspace, project):
+        url = _v1(workspace, project, "logs")
+        before = timezone.now()
+
+        last_40 = api_key_client.post(url, {"text": "a", "duration_minutes": 40}, format="json").json()
+        start = datetime.fromisoformat(last_40["occurred_at"])
+        end = datetime.fromisoformat(last_40["ended_at"])
+        assert end - start == timedelta(minutes=40)
+        assert before <= end <= timezone.now()
+
+        moment = api_key_client.post(url, {"text": "b"}, format="json").json()
+        assert moment["ended_at"] is None
+        assert before <= datetime.fromisoformat(moment["occurred_at"]) <= timezone.now()
+
+        # Without an offset the project time zone applies
+        project.timezone = "Europe/Warsaw"
+        project.save()
+        body = {"text": "c", "started_at": "2026-07-01 10:00", "duration_minutes": 30}
+        local = api_key_client.post(url, body, format="json").json()
+        assert (local["occurred_at"], local["ended_at"]) == ("2026-07-01T08:00:00+00:00", "2026-07-01T08:30:00+00:00")
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {},
+            {"text": "   "},
+            {"text": "x" * 4001},
+            {"text": "a", "started_at": "yesterday"},
+            {"text": "a", "started_at": "2026-07-01T10:00:00Z", "ended_at": "2026-07-01T09:00:00Z"},
+            {"text": "a", "started_at": "2026-07-01T08:00:00Z", "ended_at": "2026-07-01T20:01:00Z"},
+            {"text": "a", "started_at": "2026-07-01T10:00Z", "ended_at": "2026-07-01T11:00Z", "duration_minutes": 5},
+            {"text": "a", "started_at": "2026-13-01T10:00:00Z"},
+            {"text": "a", "ended_at": "2026-07-01T11:00:00Z"},
+            {"text": "a", "duration_minutes": 0},
+            {"text": "a", "duration_minutes": "40"},
+            {"text": "a", "started_at": "2099-01-01T00:00:00Z"},
+            {"text": "a", "issue": "AP-99999"},
+            {"text": "a", "issue": "XX-1"},
+            {"text": "a", "page": "not-a-uuid"},
+            {"text": "a", "kind": "issue.state"},
+        ],
+    )
+    def test_invalid_entries(self, api_key_client, workspace, project, body):
+        response = api_key_client.post(_v1(workspace, project, "logs"), body, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "error" in response.json()
+        assert not ActivityEvent.objects.filter(project=project).exists()
+
+    @pytest.mark.django_db
+    def test_work_items_and_pages_of_other_projects_are_rejected(self, api_key_client, workspace, project, create_user):
+        other = Project.objects.create(name="Other", identifier="OT", workspace=workspace, created_by=create_user)
+        issue = Issue.objects.create(name="Elsewhere", project=other, workspace=workspace)
+        page = _make_page(other, create_user)
+        url = _v1(workspace, project, "logs")
+
+        assert api_key_client.post(url, {"text": "a", "issue": str(issue.id)}, format="json").status_code == 400
+        assert api_key_client.post(url, {"text": "a", "page": str(page.id)}, format="json").status_code == 400
+
+        own_page = _make_page(project, create_user, name="Notes")
+        response = api_key_client.post(url, {"text": "a", "page": str(own_page.id)}, format="json")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["page"]["name"] == "Notes"
+
+    @pytest.mark.django_db
+    def test_change_and_delete(self, api_key_client, workspace, project, create_user):
+        entry = _log(project, create_user, _utc(2026, 7, 1, 8, 0), _utc(2026, 7, 1, 9, 0))
+        url = f"{_v1(workspace, project, 'logs')}{entry.id}/"
+
+        response = api_key_client.patch(url, {"started_at": "2026-07-01T07:30:00Z"}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        # A new start keeps the length
+        assert response.json()["ended_at"] == "2026-07-01T08:30:00+00:00"
+        assert response.json()["updated_at"] is not None
+
+        response = api_key_client.patch(url, {"text": "Better text", "ended_at": None}, format="json")
+        assert (response.json()["note"], response.json()["ended_at"]) == ("Better text", None)
+        assert api_key_client.patch(url, {}, format="json").status_code == status.HTTP_400_BAD_REQUEST
+        assert api_key_client.get(url).json()["note"] == "Better text"
+
+        assert api_key_client.delete(url).status_code == status.HTTP_204_NO_CONTENT
+        assert api_key_client.get(url).status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_only_the_author_or_an_admin_changes_an_entry(self, workspace, project, create_user):
+        author = _member(project, 15)
+        entry = _log(project, author, _utc(2026, 7, 1, 8, 0))
+        url = f"{_v1(workspace, project, 'logs')}{entry.id}/"
+        other_member = _key_client(_member(project, 15))
+        guest = _key_client(_member(project, 5))
+
+        assert other_member.get(url).status_code == status.HTTP_200_OK
+        assert other_member.patch(url, {"text": "x"}, format="json").status_code == status.HTTP_403_FORBIDDEN
+        assert other_member.delete(url).status_code == status.HTTP_403_FORBIDDEN
+        assert guest.post(_v1(workspace, project, "logs"), {"text": "x"}, format="json").status_code == 403
+        assert guest.get(url).status_code == status.HTTP_403_FORBIDDEN
+
+        assert _key_client(author).patch(url, {"text": "mine"}, format="json").status_code == status.HTTP_200_OK
+        assert _key_client(create_user).delete(url).status_code == status.HTTP_204_NO_CONTENT
+
+    @pytest.mark.django_db
+    def test_other_events_cannot_be_changed(self, api_key_client, workspace, project, create_user):
+        event = _event(project, create_user, _utc(2026, 7, 1, 8, 0))
+        url = f"{_v1(workspace, project, 'logs')}{event.id}/"
+
+        assert api_key_client.patch(url, {"text": "x"}, format="json").status_code == status.HTTP_404_NOT_FOUND
+        assert api_key_client.delete(url).status_code == status.HTTP_404_NOT_FOUND
+        assert ActivityEvent.objects.filter(id=event.id).exists()
+
+    @pytest.mark.django_db
+    def test_entries_fill_every_quarter_of_their_range(self, api_key_client, workspace, project, create_user):
+        # 10:05-10:50 Warsaw time: quarters 10:00, 10:15, 10:30, 10:45 (slots 40-43); one more event at 10:20
+        _log(project, create_user, _utc(2026, 7, 1, 8, 5), _utc(2026, 7, 1, 8, 50))
+        _event(project, create_user, _utc(2026, 7, 1, 8, 20))
+        # Started the day before: only the part inside the range counts
+        _log(project, create_user, _utc(2026, 6, 30, 21, 30), _utc(2026, 6, 30, 22, 15))
+
+        data = api_key_client.get(
+            _v1(workspace, project, "heatmap"), {"from": "2026-07-01", "to": "2026-07-01", "tz": "Europe/Warsaw"}
+        ).json()
+
+        assert [(b["slot"], b["count"]) for b in data["buckets"]] == [(0, 1), (40, 1), (41, 2), (42, 1), (43, 1)]
+        assert data["buckets"][2]["by_kind"] == {K.LOG_ENTRY: 1, K.ISSUE_STATE: 1}
+        assert data["buckets"][1]["start"] == "2026-07-01T10:00:00+02:00"
+        assert data["summary"]["events"] == 3
+        assert data["summary"]["by_kind"] == {K.LOG_ENTRY: 2, K.ISSUE_STATE: 1}
+        assert data["summary"]["active_buckets"] == 5
+
+    @pytest.mark.django_db
+    def test_range_over_the_repeated_hour(self, api_key_client, workspace, project, create_user):
+        # 25 Oct 2026, 00:30-01:45 UTC: 02:30, 02:45 CEST, then 02:00, 02:15, 02:30 CET; 02:30 counts once
+        _log(project, create_user, _utc(2026, 10, 25, 0, 30), _utc(2026, 10, 25, 1, 45))
+
+        data = api_key_client.get(
+            _v1(workspace, project, "heatmap"), {"from": "2026-10-25", "to": "2026-10-25", "tz": "Europe/Warsaw"}
+        ).json()
+
+        assert [(b["slot"], b["count"]) for b in data["buckets"]] == [(8, 1), (9, 1), (10, 1), (11, 1)]
+
+    @pytest.mark.django_db
+    def test_a_quarter_inside_an_entry_lists_it(self, api_key_client, workspace, project, create_user):
+        entry = _log(project, create_user, _utc(2026, 7, 1, 8, 0), _utc(2026, 7, 1, 10, 0), text="Long migration")
+        _log(project, create_user, _utc(2026, 7, 1, 11, 0))  # later, outside the quarter
+
+        results = api_key_client.get(
+            _v1(workspace, project, "events"),
+            {"start": "2026-07-01T09:15:00Z", "end": "2026-07-01T09:30:00Z"},
+        ).json()["results"]
+
+        assert [(r["id"], r["note"]) for r in results] == [(entry.id, "Long migration")]
+
+    @pytest.mark.django_db
+    def test_list_and_settings(self, workspace, project, create_user, session_client):
+        _log(project, create_user, _utc(2026, 7, 1, 8, 0))
+        _event(project, create_user, _utc(2026, 7, 1, 8, 1))
+        # Settings that do not count log entries still list them
+        ProjectActivitySettings.objects.create(project=project, kinds=[K.ISSUE_STATE])
+        params = {"from": "2026-07-01", "to": "2026-07-01", "tz": "UTC"}
+
+        results = session_client.get(_app(workspace, project, "logs"), params).json()["results"]
+        assert [r["kind"] for r in results] == [K.LOG_ENTRY]
+        assert session_client.get(_app(workspace, project, "heatmap"), params).json()["summary"]["events"] == 1
+        catalog = session_client.get(_app(workspace, project, "settings")).json()["catalog"]
+        assert catalog[-1] == {"group": "log", "kinds": [{"key": K.LOG_ENTRY, "default": True}]}
+
+    @pytest.mark.django_db
+    def test_app_endpoint_creates_with_the_session_user(self, session_client, workspace, project, create_user):
+        response = session_client.post(_app(workspace, project, "logs"), {"text": "From the UI"}, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert ActivityEvent.objects.get(id=response.json()["id"]).actor_id == create_user.id
+
+
+@pytest.mark.unit
+class TestLogMigration:
+    @pytest.mark.django_db
+    def test_saved_settings_start_counting_log_entries(self, project):
+        from importlib import import_module
+
+        from django.apps import apps
+
+        migration = import_module("plane.liviere.migrations.0003_activity_log")
+        ProjectActivitySettings.objects.create(project=project, kinds=[K.ISSUE_STATE])
+
+        migration.count_log_entries(apps, None)
+        assert ProjectActivitySettings.objects.get(project=project).kinds == [K.ISSUE_STATE, K.LOG_ENTRY]
+        migration.count_log_entries(apps, None)
+        assert ProjectActivitySettings.objects.get(project=project).kinds == [K.ISSUE_STATE, K.LOG_ENTRY]
+        migration.stop_counting_log_entries(apps, None)
+        assert ProjectActivitySettings.objects.get(project=project).kinds == [K.ISSUE_STATE]

@@ -10,6 +10,8 @@ from django.urls import path
 from .activity import (
     ProjectActivityEventsAPIEndpoint,
     ProjectActivityHeatmapAPIEndpoint,
+    ProjectActivityLogDetailAPIEndpoint,
+    ProjectActivityLogsAPIEndpoint,
     ProjectActivitySettingsAPIEndpoint,
 )
 from .views import PageArchiveUnarchiveAPIEndpoint, PageDetailAPIEndpoint, PageListCreateAPIEndpoint
@@ -44,5 +46,15 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/activity/settings/",
         ProjectActivitySettingsAPIEndpoint.as_view(http_method_names=["get"]),
         name="liviere-project-activity-settings-v1",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/activity/logs/",
+        ProjectActivityLogsAPIEndpoint.as_view(http_method_names=["get", "post"]),
+        name="liviere-project-activity-logs-v1",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/activity/logs/<int:log_id>/",
+        ProjectActivityLogDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
+        name="liviere-project-activity-log-detail-v1",
     ),
 ]
