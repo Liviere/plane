@@ -23,6 +23,7 @@ type Props = {
   // The entry to change; a new one starts in the selected quarter, or ends now
   entry?: TActivityEvent;
   bucket?: TSelectedBucket | null;
+  onSaved?: () => void;
   onClose: () => void;
 };
 
@@ -56,7 +57,7 @@ function initialForm(entry?: TActivityEvent, bucket?: TSelectedBucket | null) {
 }
 
 export function ActivityLogModal(props: Props) {
-  const { workspaceSlug, projectId, entry, bucket, onClose } = props;
+  const { workspaceSlug, projectId, entry, bucket, onSaved, onClose } = props;
   const { t } = useTranslation();
   const [form, setForm] = useState(() => initialForm(entry, bucket));
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export function ActivityLogModal(props: Props) {
       if (entry) await projectActivityService.updateLog(workspaceSlug, projectId, entry.id, data);
       else await projectActivityService.createLog(workspaceSlug, projectId, data);
       await refreshProjectActivity(projectId);
+      onSaved?.();
       onClose();
     } catch (e) {
       setError((e as { error?: string } | undefined)?.error ?? t("liviere.activity.log.save_error"));

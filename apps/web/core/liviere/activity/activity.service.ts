@@ -18,6 +18,9 @@ import type {
   TActivitySettings,
 } from "./types";
 
+// Entries per page of the work log view
+const LOG_PAGE_SIZE = 50;
+
 export class ProjectActivityService extends APIService {
   constructor() {
     super(API_BASE_URL);
@@ -67,6 +70,21 @@ export class ProjectActivityService extends APIService {
     data: Partial<Pick<TActivitySettings, "enabled" | "kinds">>
   ): Promise<TActivitySettings> {
     return this.patch(this.projectUrl(workspaceSlug, projectId, "settings"), data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async getLogs(
+    workspaceSlug: string,
+    projectId: string,
+    query: TActivityQuery,
+    cursor?: string
+  ): Promise<TActivityEventsPage> {
+    return this.get(this.projectUrl(workspaceSlug, projectId, "logs"), {
+      params: { ...this.queryParams(query), per_page: LOG_PAGE_SIZE, ...(cursor ? { cursor } : {}) },
+    })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

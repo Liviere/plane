@@ -2,6 +2,8 @@
   "liviere": {
     "activity": {
       "title": "Aktywność",
+      "view_grid": "Siatka",
+      "view_log": "Dziennik",
       "range_days": "{days} dni",
       "all_members": "Wszyscy członkowie",
       "summary": "Aktywne kwadranse: {active} ≈ {hours} h · akcje: {events}",
@@ -116,7 +118,10 @@
         "save_error": "Nie udało się zapisać wpisu. Spróbuj ponownie.",
         "delete_title": "Usuń wpis dziennika",
         "delete_confirm": "Wpis zostanie trwale usunięty. Tej operacji nie można cofnąć.",
-        "delete_error": "Nie udało się usunąć wpisu. Spróbuj ponownie."
+        "delete_error": "Nie udało się usunąć wpisu. Spróbuj ponownie.",
+        "day_summary": "{count, plural, one {# wpis} few {# wpisy} many {# wpisów} other {# wpisu}} · {duration}",
+        "empty_title": "Brak wpisów dziennika w tym zakresie",
+        "empty_description": "Wpisy mówią, co i kiedy zostało zrobione. Dodaj je tutaj albo pozwól agentom AI zapisywać je przez API lub skrypt plane-log."
       }
     }
   }
