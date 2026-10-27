@@ -66,3 +66,17 @@ export const slotBounds = (date: string, slot: number): { start: string; end: st
   const end = slot === SLOTS_PER_DAY - 1 ? `${shiftDate(date, 1)}T00:00:00` : `${date}T${slotTime(slot + 1)}:00`;
   return { start: `${date}T${slotTime(slot)}:00`, end };
 };
+
+/** Minutes covered by time ranges (epoch ms, [start, end)); time where ranges overlap counts once. */
+export const coveredMinutes = (ranges: [number, number][]): number => {
+  let total = 0;
+  let coveredUntil = -Infinity;
+  // oxlint-disable-next-line unicorn/no-array-sort -- sorts the fresh copy made by filter; empty ranges add nothing
+  const sorted = ranges.filter(([start, end]) => end > start).sort((a, b) => a[0] - b[0]);
+  for (const [start, end] of sorted) {
+    if (end <= coveredUntil) continue;
+    total += end - Math.max(start, coveredUntil);
+    coveredUntil = end;
+  }
+  return total / 60_000;
+};

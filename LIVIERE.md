@@ -154,7 +154,8 @@ ISO date-times, without an offset in the project time zone; at most 12 h, not in
 author or a project admin changes and deletes (hard delete). A `PATCH` with a new start keeps the length. The
 same endpoints exist for the app under `/api/workspaces/.../projects/{id}/liviere/activity/logs/`; the
 *Activity* page has *Add entry* and edit/delete in the list of a quarter; its *Work log* tab (`?view=log`) lists
-the entries of the chosen range by day, with the count and logged time per day, and loads more while scrolling.
+the entries of the chosen range by day, with the count and the time covered per day (overlapping entries and
+parallel sessions count once; computed from the loaded entries), and loads more while scrolling.
 
 **`liviere/tools/plane-log`** – a command-line client for agents (Python standard library only). It reads the
 token from `~/.config/plane-mcp/env`, like the Plane MCP setup, and takes project identifiers:

@@ -17,6 +17,7 @@ import { ActivitySettingsLoader } from "@/components/ui/loader/settings/activity
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { projectActivityService } from "./activity.service";
 import { ActivityEventRow } from "./activity-event-row";
+import { coveredMinutes } from "./grid";
 import type { TActivityEvent, TActivityEventsPage, TActivityQuery } from "./types";
 
 type Props = {
@@ -79,9 +80,15 @@ export function ActivityLogList(props: Props) {
         grouped.push(day);
       }
       day.entries.push(entry);
-      day.minutes += entry.ended_at
-        ? (new Date(entry.ended_at).getTime() - new Date(entry.occurred_at).getTime()) / 60_000
-        : MOMENT_MINUTES;
+    }
+    // Time covered by the day's entries: parallel sessions and overlapping entries count once
+    for (const day of grouped) {
+      day.minutes = coveredMinutes(
+        day.entries.map((entry) => {
+          const start = new Date(entry.occurred_at).getTime();
+          return [start, entry.ended_at ? new Date(entry.ended_at).getTime() : start + MOMENT_MINUTES * 60_000];
+        })
+      );
     }
     return grouped;
   }, [data, query.tz]);
