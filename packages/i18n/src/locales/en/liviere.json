@@ -1,0 +1,101 @@
+{
+  "liviere": {
+    "activity": {
+      "title": "Activity",
+      "range_days": "{days} days",
+      "all_members": "All members",
+      "summary": "{active} active quarters ≈ {hours} h · {events} actions",
+      "footnote": "One square is 15 minutes ({timezone}). The approximate time counts quarters with any activity; it is not logged working time.",
+      "actions": "{count, plural, one {# action} other {# actions}}",
+      "no_activity": "No activity",
+      "less": "Less",
+      "more": "More",
+      "close": "Close",
+      "load_error": "Activity could not be loaded. Please try again later.",
+      "untitled": "Untitled",
+      "deleted": "deleted",
+      "more_events": "Showing the latest 200 of {count} actions.",
+      "disabled": {
+        "title": "Activity is turned off",
+        "description": "A project admin can turn it on in project settings → Features → Activity.",
+        "no_access": "Only project admins and members can see the activity of this project.",
+        "open_settings": "Open settings"
+      },
+      "settings": {
+        "title": "Activity",
+        "description": "A heatmap of when work happens in this project: one square per 15 minutes, a darker colour for more actions. Data are also available through the API.",
+        "toggle_title": "Enable activity",
+        "toggle_description": "Shows Activity in the project navigation. Actions are recorded either way, so turning it on later shows the past too.",
+        "kinds_title": "Counted actions",
+        "kinds_description": "Pick the actions that count as activity. The choice also applies to past actions.",
+        "save_error": "The setting could not be saved. Please try again."
+      },
+      "groups": {
+        "issues": "Work items",
+        "pages": "Pages",
+        "cycles_modules": "Cycles and modules",
+        "views": "Views"
+      },
+      "kinds": {
+        "issue": {
+          "created": "Work item created",
+          "state": "State changed",
+          "property": "Property changed",
+          "description": "Description edited",
+          "comment": "Comment",
+          "link": "Link or attachment",
+          "relation": "Relation or sub-work item",
+          "cycle_module": "Added to a cycle or module",
+          "archive": "Archived or deleted",
+          "intake": "Intake",
+          "reaction": "Reaction or vote"
+        },
+        "page": {
+          "created": "Page created",
+          "edited": "Page edited",
+          "renamed": "Page renamed",
+          "archive": "Page archived or deleted"
+        },
+        "cycle": {
+          "changed": "Cycle created or changed"
+        },
+        "module": {
+          "changed": "Module created or changed"
+        },
+        "view": {
+          "changed": "View created or changed"
+        }
+      },
+      "kind_descriptions": {
+        "issue": {
+          "created": "A new work item in the project.",
+          "state": "Moving a work item to another state.",
+          "property": "Name, assignees, priority, labels, dates, estimate or parent.",
+          "description": "Changes to the description of a work item.",
+          "comment": "Adding, editing or deleting a comment.",
+          "link": "Adding or removing a link or an attachment.",
+          "relation": "Blocking, related, duplicate and other relations.",
+          "cycle_module": "Adding a work item to a cycle or module, or removing it.",
+          "archive": "Archiving, restoring or deleting a work item.",
+          "intake": "Work items coming in through Intake.",
+          "reaction": "Emoji reactions and votes."
+        },
+        "page": {
+          "created": "A new page in the project.",
+          "edited": "Editing page content, at most once a minute per person and page.",
+          "renamed": "Changing the title of a page.",
+          "archive": "Archiving, restoring or deleting a page."
+        },
+        "cycle": {
+          "changed": "Creating or editing a cycle."
+        },
+        "module": {
+          "changed": "Creating or editing a module."
+        },
+        "view": {
+          "changed": "Creating or editing a view of this project."
+        }
+      }
+    }
+  }
+}

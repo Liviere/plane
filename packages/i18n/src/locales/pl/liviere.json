@@ -1,0 +1,101 @@
+{
+  "liviere": {
+    "activity": {
+      "title": "Aktywność",
+      "range_days": "{days} dni",
+      "all_members": "Wszyscy członkowie",
+      "summary": "Aktywne kwadranse: {active} ≈ {hours} h · akcje: {events}",
+      "footnote": "Jeden kwadracik to 15 minut ({timezone}). Przybliżony czas liczy kwadranse z jakąkolwiek aktywnością; to nie jest zalogowany czas pracy.",
+      "actions": "{count, plural, one {# akcja} few {# akcje} many {# akcji} other {# akcji}}",
+      "no_activity": "Brak aktywności",
+      "less": "Mniej",
+      "more": "Więcej",
+      "close": "Zamknij",
+      "load_error": "Nie udało się wczytać aktywności. Spróbuj ponownie później.",
+      "untitled": "Bez tytułu",
+      "deleted": "usunięte",
+      "more_events": "Pokazano 200 najnowszych z {count} akcji.",
+      "disabled": {
+        "title": "Aktywność jest wyłączona",
+        "description": "Admin projektu może ją włączyć w ustawieniach projektu → Funkcje → Aktywność.",
+        "no_access": "Aktywność projektu widzą tylko admini i członkowie projektu.",
+        "open_settings": "Otwórz ustawienia"
+      },
+      "settings": {
+        "title": "Aktywność",
+        "description": "Mapa tego, kiedy w projekcie toczy się praca: jeden kwadracik na 15 minut, ciemniejszy kolor przy większej liczbie akcji. Dane są dostępne także przez API.",
+        "toggle_title": "Włącz aktywność",
+        "toggle_description": "Pokazuje Aktywność w nawigacji projektu. Akcje są zapisywane niezależnie od tego, więc po późniejszym włączeniu widać też przeszłość.",
+        "kinds_title": "Liczone akcje",
+        "kinds_description": "Wybierz akcje, które liczą się jako aktywność. Wybór dotyczy też akcji z przeszłości.",
+        "save_error": "Nie udało się zapisać ustawienia. Spróbuj ponownie."
+      },
+      "groups": {
+        "issues": "Elementy pracy",
+        "pages": "Strony",
+        "cycles_modules": "Cykle i moduły",
+        "views": "Widoki"
+      },
+      "kinds": {
+        "issue": {
+          "created": "Utworzenie elementu pracy",
+          "state": "Zmiana stanu",
+          "property": "Zmiana właściwości",
+          "description": "Edycja opisu",
+          "comment": "Komentarz",
+          "link": "Link lub załącznik",
+          "relation": "Relacja lub element podrzędny",
+          "cycle_module": "Dodanie do cyklu lub modułu",
+          "archive": "Archiwizacja lub usunięcie",
+          "intake": "Intake",
+          "reaction": "Reakcja lub głos"
+        },
+        "page": {
+          "created": "Utworzenie strony",
+          "edited": "Edycja strony",
+          "renamed": "Zmiana nazwy strony",
+          "archive": "Archiwizacja lub usunięcie strony"
+        },
+        "cycle": {
+          "changed": "Utworzenie lub zmiana cyklu"
+        },
+        "module": {
+          "changed": "Utworzenie lub zmiana modułu"
+        },
+        "view": {
+          "changed": "Utworzenie lub zmiana widoku"
+        }
+      },
+      "kind_descriptions": {
+        "issue": {
+          "created": "Nowy element pracy w projekcie.",
+          "state": "Przeniesienie elementu pracy do innego stanu.",
+          "property": "Nazwa, osoby przypisane, priorytet, etykiety, daty, szacunek lub element nadrzędny.",
+          "description": "Zmiany w opisie elementu pracy.",
+          "comment": "Dodanie, edycja lub usunięcie komentarza.",
+          "link": "Dodanie lub usunięcie linku albo załącznika.",
+          "relation": "Blokowanie, powiązanie, duplikat i inne relacje.",
+          "cycle_module": "Dodanie elementu pracy do cyklu lub modułu albo usunięcie z niego.",
+          "archive": "Archiwizacja, przywrócenie lub usunięcie elementu pracy.",
+          "intake": "Elementy pracy przychodzące przez Intake.",
+          "reaction": "Reakcje emoji i głosy."
+        },
+        "page": {
+          "created": "Nowa strona w projekcie.",
+          "edited": "Edycja treści strony, najwyżej raz na minutę na osobę i stronę.",
+          "renamed": "Zmiana tytułu strony.",
+          "archive": "Archiwizacja, przywrócenie lub usunięcie strony."
+        },
+        "cycle": {
+          "changed": "Utworzenie lub edycja cyklu."
+        },
+        "module": {
+          "changed": "Utworzenie lub edycja modułu."
+        },
+        "view": {
+          "changed": "Utworzenie lub edycja widoku tego projektu."
+        }
+      }
+    }
+  }
+}

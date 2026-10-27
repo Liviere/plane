@@ -7,6 +7,11 @@
 
 from django.urls import path
 
+from .activity import (
+    ProjectActivityEventsAPIEndpoint,
+    ProjectActivityHeatmapAPIEndpoint,
+    ProjectActivitySettingsAPIEndpoint,
+)
 from .views import PageArchiveUnarchiveAPIEndpoint, PageDetailAPIEndpoint, PageListCreateAPIEndpoint
 
 urlpatterns = [
@@ -24,5 +29,20 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/pages/<uuid:page_id>/archive/",
         PageArchiveUnarchiveAPIEndpoint.as_view(http_method_names=["post", "delete"]),
         name="liviere-page-archive",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/activity/heatmap/",
+        ProjectActivityHeatmapAPIEndpoint.as_view(http_method_names=["get"]),
+        name="liviere-project-activity-heatmap-v1",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/activity/events/",
+        ProjectActivityEventsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="liviere-project-activity-events-v1",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/activity/settings/",
+        ProjectActivitySettingsAPIEndpoint.as_view(http_method_names=["get"]),
+        name="liviere-project-activity-settings-v1",
     ),
 ]

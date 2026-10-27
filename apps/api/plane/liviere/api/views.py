@@ -28,6 +28,7 @@ from plane.app.views.page.base import unarchive_archive_page_and_descendants
 from plane.bgtasks.page_transaction_task import page_transaction
 from plane.bgtasks.page_version_task import track_page_version
 from plane.db.models import Page, Project, ProjectMember, ProjectPage, UserFavorite, UserRecentVisit
+from plane.liviere.activity.record import record_page_archive
 from plane.liviere.live_client import LiveUnavailable, apply_page_edit, publish_page_update
 from plane.liviere.pages import api_changes_blocked, api_changes_blocked_response, is_owner_or_admin
 from plane.utils.exception_logger import log_exception
@@ -332,6 +333,7 @@ class PageArchiveUnarchiveAPIEndpoint(BaseAPIView):
         ).delete()
         archived_at = datetime.now()
         unarchive_archive_page_and_descendants(page_id, archived_at)
+        record_page_archive(page_id, request.user)
         return Response({"archived_at": str(archived_at)}, status=status.HTTP_200_OK)
 
     def delete(self, request, slug, project_id, page_id):
@@ -350,4 +352,5 @@ class PageArchiveUnarchiveAPIEndpoint(BaseAPIView):
             page.save(update_fields=["parent"])
 
         unarchive_archive_page_and_descendants(page_id, None)
+        record_page_archive(page_id, request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

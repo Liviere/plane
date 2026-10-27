@@ -1,0 +1,68 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+// Liviere/plane fork: pure helpers of the activity heatmap (rows = days, columns = quarters of the day).
+
+import type { TActivityBucket } from "./types";
+
+export const SLOTS_PER_DAY = 96;
+export const LEVELS = 5; // 0 = no activity, 1-4 = quartiles of the non-empty quarters
+
+/** Shifts a YYYY-MM-DD date by whole days. */
+export const shiftDate = (date: string, days: number): string => {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+};
+
+/** Local dates from `from` to `to` (YYYY-MM-DD, inclusive), newest first. */
+export const daysInRange = (from: string, to: string): string[] => {
+  const count = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  return Array.from({ length: Math.max(0, count) }, (_, index) => shiftDate(to, -index));
+};
+
+/** Today's date in a time zone, YYYY-MM-DD. */
+export const todayIn = (timeZone: string): string => new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+
+export const bucketKey = (date: string, slot: number) => `${date}#${slot}`;
+
+export const indexBuckets = (buckets: TActivityBucket[]): Map<string, TActivityBucket> =>
+  new Map(buckets.map((bucket) => [bucketKey(bucket.date, bucket.slot), bucket]));
+
+/**
+ * Upper bounds of levels 1-3 (level 4 is everything above), from the quartiles of the non-empty counts, so
+ * a quiet project still shows contrast and a single busy quarter does not flatten the rest.
+ */
+export const levelThresholds = (counts: number[]): [number, number, number] => {
+  // oxlint-disable-next-line unicorn/no-array-sort -- sorts the fresh copy made by filter
+  const sorted = counts.filter((count) => count > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return [1, 1, 1];
+  const quantile = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+  return [quantile(0.25), quantile(0.5), quantile(0.75)];
+};
+
+export const levelOf = (count: number, thresholds: [number, number, number]): number => {
+  if (count <= 0) return 0;
+  if (count <= thresholds[0]) return 1;
+  if (count <= thresholds[1]) return 2;
+  if (count <= thresholds[2]) return 3;
+  return 4;
+};
+
+const pad = (value: number) => value.toString().padStart(2, "0");
+
+/** "14:15" for slot 57. */
+export const slotTime = (slot: number): string => `${pad(Math.floor(slot / 4))}:${pad((slot % 4) * 15)}`;
+
+/** "14:15–14:30" for slot 57. */
+export const slotRange = (slot: number): string =>
+  `${slotTime(slot)}–${slot === SLOTS_PER_DAY - 1 ? "24:00" : slotTime(slot + 1)}`;
+
+/** Start and end of a quarter as ISO date-times without offset; the API reads them in the given time zone. */
+export const slotBounds = (date: string, slot: number): { start: string; end: string } => {
+  const end = slot === SLOTS_PER_DAY - 1 ? `${shiftDate(date, 1)}T00:00:00` : `${date}T${slotTime(slot + 1)}:00`;
+  return { start: `${date}T${slotTime(slot)}:00`, end };
+};
