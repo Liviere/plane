@@ -24,9 +24,6 @@ export const daysInRange = (from: string, to: string): string[] => {
   return Array.from({ length: Math.max(0, count) }, (_, index) => shiftDate(to, -index));
 };
 
-/** Today's date in a time zone, YYYY-MM-DD. */
-export const todayIn = (timeZone: string): string => new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
-
 export const bucketKey = (date: string, slot: number) => `${date}#${slot}`;
 
 export const indexBuckets = (buckets: TActivityBucket[]): Map<string, TActivityBucket> =>
@@ -80,3 +77,31 @@ export const coveredMinutes = (ranges: [number, number][]): number => {
   }
   return total / 60_000;
 };
+
+export type TQuarter = { date: string; slot: number };
+
+const QUARTER_MS = 15 * 60_000;
+
+/** Local date (YYYY-MM-DD) and quarter of the day (0-95) of a moment in a time zone. */
+export const currentQuarter = (timeZone: string, now: Date = new Date()): TQuarter => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    slot: Number(parts.hour) * 4 + Math.floor(Number(parts.minute) / 15),
+  };
+};
+
+/** Milliseconds until the next quarter starts; time zone offsets are whole quarters, so this holds in any zone. */
+export const msToNextQuarter = (now: number = Date.now()): number => QUARTER_MS - (now % QUARTER_MS);

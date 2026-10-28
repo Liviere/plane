@@ -6,12 +6,13 @@
 
 // Liviere/plane fork: data hooks of the project activity heatmap.
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { EUserPermissions } from "@plane/constants";
 import type { TNavigationItem } from "@/components/navigation/tab-navigation-root";
 import { projectActivityService } from "./activity.service";
 import { ActivityIcon } from "./activity-icon";
+import { currentQuarter, msToNextQuarter } from "./grid";
 import type { TActivityQuery } from "./types";
 
 export const ACTIVITY_NAVIGATION_KEY = "liviere_activity";
@@ -68,3 +69,25 @@ export const refreshProjectActivity = (projectId: string) =>
       (key.startsWith(`LIVIERE_ACTIVITY_HEATMAP_${projectId}_`) ||
         key.startsWith(`LIVIERE_ACTIVITY_EVENTS_${projectId}_`))
   );
+
+/** The current quarter of the day in a time zone; changes when the next quarter starts. */
+export const useCurrentQuarter = (timeZone: string) => {
+  const [quarter, setQuarter] = useState(() => currentQuarter(timeZone));
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      clearTimeout(timer);
+      const next = currentQuarter(timeZone);
+      setQuarter((previous) => (previous.date === next.date && previous.slot === next.slot ? previous : next));
+      // A second past the boundary; browsers delay timers of background tabs, so visibility changes update too
+      timer = setTimeout(update, msToNextQuarter() + 1000);
+    };
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [timeZone]);
+  return quarter;
+};
