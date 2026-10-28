@@ -5,12 +5,14 @@
  */
 
 // Liviere/plane fork: the heatmap itself. Up to 90 × 96 cells, so a single hover card follows the pointer
-// instead of a tooltip component per cell.
+// instead of a tooltip component per cell. The current quarter has an amber outline; later quarters of today
+// are dimmed.
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "@plane/i18n";
 import { cn } from "@plane/utils";
 import { SLOTS_PER_DAY, bucketKey, daysInRange, indexBuckets, levelOf, levelThresholds, slotRange } from "./grid";
+import type { TQuarter } from "./grid";
 import type { TActivityHeatmap } from "./types";
 import type { TSelectedBucket } from "./activity-root";
 
@@ -21,6 +23,7 @@ const LEVEL_CLASSES = [
   "bg-accent-primary/75",
   "bg-accent-primary",
 ];
+const NOW_CLASS = "outline-2 outline-offset-1 outline-warning-strong";
 const HOUR_LABEL_EVERY = 3;
 // Day label, then the 96 quarters; the quarters share the width, so the whole day fits on screen
 const GRID_STYLE: React.CSSProperties = {
@@ -31,6 +34,7 @@ const GRID_STYLE: React.CSSProperties = {
 type Props = {
   heatmap: TActivityHeatmap;
   locale: string;
+  now: TQuarter;
   selected: TSelectedBucket | null;
   onSelect: (bucket: TSelectedBucket | null) => void;
 };
@@ -44,7 +48,7 @@ const cellFromEvent = (event: React.MouseEvent): { date: string; slot: number } 
 };
 
 export function ActivityGrid(props: Props) {
-  const { heatmap, locale, selected, onSelect } = props;
+  const { heatmap, locale, now, selected, onSelect } = props;
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<THover | null>(null);
@@ -108,16 +112,20 @@ export function ActivityGrid(props: Props) {
                   const bucket = buckets.get(bucketKey(date, slot));
                   const level = levelOf(bucket?.count ?? 0, thresholds);
                   const isSelected = selected?.date === date && selected.slot === slot;
+                  const isNow = date === now.date && slot === now.slot;
                   return (
                     <span
                       key={slot}
                       role="gridcell"
+                      aria-current={isNow ? "time" : undefined}
                       data-date={date}
                       data-slot={slot}
                       className={cn(
                         "aspect-square w-full rounded-[2px]",
                         LEVEL_CLASSES[level],
                         bucket && "cursor-pointer",
+                        date === now.date && slot > now.slot && "opacity-40",
+                        isNow && NOW_CLASS,
                         isSelected && "outline-2 outline-offset-1 outline-accent-strong"
                       )}
                     />
@@ -134,6 +142,7 @@ export function ActivityGrid(props: Props) {
           >
             <div className="font-medium text-primary">
               {dayLabel(hover.date)}, {slotRange(hover.slot)}
+              {hover.date === now.date && hover.slot === now.slot && ` · ${t("liviere.activity.now")}`}
             </div>
             {hovered ? (
               <>
@@ -161,6 +170,8 @@ export function ActivityGrid(props: Props) {
           <span key={className} className={cn("size-[10px] rounded-[2px]", className)} />
         ))}
         <span className="ml-1">{t("liviere.activity.more")}</span>
+        <span className={cn("ml-3 size-[10px] rounded-[2px] bg-layer-3", NOW_CLASS)} />
+        <span className="ml-1">{t("liviere.activity.now")}</span>
       </div>
     </div>
   );

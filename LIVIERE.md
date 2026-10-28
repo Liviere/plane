@@ -90,7 +90,8 @@ done in the app only (403 through the API). A locked page refuses every change t
 
 A per-project heatmap of when work happens, like GitHub contributions but finer: rows are days, columns are the
 96 quarters of the day, the colour says how many actions happened in that quarter. It also gives an approximate
-time (quarters with any activity × 15 min) – not logged working time.
+time (quarters with any activity × 15 min) – not logged working time. The current quarter has an amber outline
+and the rest of today is dimmed; the page moves both on every quarter, without a reload.
 
 Code: `apps/api/plane/liviere/activity/` (catalog, recording, queries), `liviere/models.py`
 (`ActivityEvent`, `ProjectActivitySettings`), `liviere/app/activity.py` and `liviere/api/activity.py`

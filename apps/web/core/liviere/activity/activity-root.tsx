@@ -28,9 +28,9 @@ import { ActivityEventList } from "./activity-events";
 import { ActivityGrid } from "./activity-grid";
 import { ActivityLogList } from "./activity-log-list";
 import { ActivityLogModal } from "./activity-log-modal";
-import { shiftDate, todayIn } from "./grid";
+import { shiftDate } from "./grid";
 import type { TActivityEvent } from "./types";
-import { refreshProjectActivity, useActivityHeatmap } from "./use-activity";
+import { refreshProjectActivity, useActivityHeatmap, useCurrentQuarter } from "./use-activity";
 
 const RANGES = [7, 30, 90];
 const VIEW_PARAM = "view";
@@ -91,7 +91,9 @@ export const ProjectActivityRoot = observer(function ProjectActivityRoot(props: 
     }
   };
 
-  const to = todayIn(timeZone);
+  // Moves on every quarter, so the grid marks the current one and a new day appears after midnight
+  const now = useCurrentQuarter(timeZone);
+  const to = now.date;
   const query = { from: shiftDate(to, -(days - 1)), to, tz: timeZone, actor };
   const { data: heatmap, error, isLoading } = useActivityHeatmap(workspaceSlug, projectId, query);
 
@@ -196,7 +198,13 @@ export const ProjectActivityRoot = observer(function ProjectActivityRoot(props: 
               ))}
             </Loader>
           ) : heatmap ? (
-            <ActivityGrid heatmap={heatmap} locale={currentLocale} selected={selected} onSelect={setSelected} />
+            <ActivityGrid
+              heatmap={heatmap}
+              locale={currentLocale}
+              now={now}
+              selected={selected}
+              onSelect={setSelected}
+            />
           ) : null}
 
           <p className="text-12 text-tertiary">{t("liviere.activity.footnote", { timezone: timeZone })}</p>
