@@ -245,6 +245,277 @@
         "projects": "Nie udało się zapisać projektów.",
         "test": "Nie udało się wysłać powiadomienia testowego."
       }
+    },
+    "decisions": {
+      "title": "Decyzje",
+      "retry": "Spróbuj ponownie",
+      "count": "{shown} z {total}",
+      "empty": "Brak decyzji dla tych filtrów.",
+      "incomplete": "Lista jest niepełna: wczytano pierwsze {count} decyzji. Zawęź ją filtrami albo zgłoś to koordynatorowi.",
+      "unavailable": {
+        "no_access": {
+          "title": "Brak dostępu",
+          "description": "Decyzje projektu widzą administratorzy i członkowie projektu."
+        },
+        "disabled": {
+          "title": "Decyzje nie są włączone w tym projekcie",
+          "description": "Administrator projektu włącza je w ustawieniach projektu, w grupie Funkcje."
+        },
+        "error": {
+          "title": "Nie udało się wczytać decyzji",
+          "description": "Sprawdź połączenie i spróbuj ponownie."
+        },
+        "open_settings": "Otwórz ustawienia"
+      },
+      "settings": {
+        "title": "Decyzje",
+        "description": "Rejestr decyzji, których trzyma się projekt: jedna decyzja to jedna reguła z numerem, stanem i historią zmian. Agenci zapisują i czytają decyzje poleceniem plane-decision, a tutaj można je przejrzeć i zmienić.",
+        "toggle_title": "Włącz Decyzje",
+        "toggle_description": "Pokazuje „Decyzje” w menu projektu i otwiera rejestr dla administratorów i członków projektu. Po wyłączeniu decyzje zostają w bazie, ale nikt ich nie czyta ani nie zmienia.",
+        "open_page": "Przejdź do decyzji",
+        "save_error": "Nie udało się zapisać ustawienia.",
+        "load_error": "Nie udało się wczytać ustawień decyzji."
+      },
+      "tree": {
+        "label": "Obszary",
+        "all": "Wszystkie obszary"
+      },
+      "filters": {
+        "status": "Stan",
+        "kind": "Rodzaj",
+        "all_kinds": "wszystkie"
+      },
+      "status_filter": {
+        "current": "obowiązujące",
+        "proposed": "proponowane",
+        "deferred": "odłożone",
+        "done": "wykonane",
+        "past": "zastąpione i wycofane",
+        "all": "wszystkie"
+      },
+      "status": {
+        "proposed": "proponowana",
+        "active": "obowiązuje",
+        "deferred": "odłożona",
+        "done": "wykonana",
+        "superseded": "zastąpiona",
+        "revoked": "wycofana"
+      },
+      "kinds": {
+        "product": "produkt",
+        "architecture": "architektura",
+        "process": "sposób pracy",
+        "operations": "operacyjne"
+      },
+      "author": {
+        "user": "właściciel",
+        "agent": "agent w imieniu właściciela",
+        "unknown": "autor nieznany"
+      },
+      "search": {
+        "placeholder": "Szukaj w decyzjach…",
+        "too_short": "Wpisz co najmniej {min} znaki, żeby szukać w treści; numer decyzji albo ticketu działa od razu.",
+        "loading": "Szukam…",
+        "has_more": "Pokazano najnowsze wyniki; zawęź frazę, żeby zobaczyć resztę.",
+        "error": "Wyszukiwanie nie działa; spróbuj ponownie za chwilę.",
+        "other_states": "{count, plural, one {Jeszcze # wynik w innych stanach.} few {Jeszcze # wyniki w innych stanach.} many {Jeszcze # wyników w innych stanach.} other {Jeszcze # wyniku w innych stanach.}}",
+        "show_all_states": "Pokaż wszystkie"
+      },
+      "groups": {
+        "general": "Ogólne",
+        "from_area": "Z obszaru: {area}"
+      },
+      "badges": {
+        "confirm": "do potwierdzenia",
+        "review": "przegląd",
+        "return": "powrót",
+        "approx": "ok.",
+        "overdue": "minął",
+        "rollout": "czeka na wdrożenie",
+        "imported": "z importu, do przejrzenia",
+        "also_area": "także: {area}"
+      },
+      "card": {
+        "estimated": "szac.",
+        "date_unknown": "data nieznana",
+        "from_area": "z obszaru: {area}",
+        "issue_hidden": "Nie masz dostępu do tego ticketu",
+        "why": "Dlaczego",
+        "rejected": "Odrzucono",
+        "chain": "Zmiany tej decyzji",
+        "split_from": "Z podziału {from}, razem z: {others}.",
+        "related": "Powiązane",
+        "note": "Uwaga",
+        "sources": "Źródła",
+        "no_sources": "brak",
+        "history": "Historia",
+        "history_loading": "Wczytuję historię…",
+        "history_error": "Nie udało się wczytać historii.",
+        "yes": "tak",
+        "no": "nie"
+      },
+      "channel": {
+        "app": "przeglądarka",
+        "api": "terminal"
+      },
+      "events": {
+        "created": "zapisana",
+        "proposed": "zaproponowana",
+        "accepted": "przyjęta",
+        "confirmed": "potwierdzona",
+        "deferred": "odłożona",
+        "resumed": "wróciła z odłożenia",
+        "done": "wykonana",
+        "revoked": "wycofana",
+        "rejected": "propozycja odrzucona",
+        "reviewed": "przejrzana, zostaje",
+        "import_reviewed": "przejrzana po imporcie",
+        "edited": "poprawiona",
+        "linked": "dopisane tickety lub źródła",
+        "superseded": "zastąpiona",
+        "rollout_ack": "wdrożona przez koordynatora",
+        "imported": "zaimportowana"
+      },
+      "fields": {
+        "title": "treść",
+        "rationale": "dlaczego",
+        "rejected": "odrzucono",
+        "note": "uwaga",
+        "area": "obszar",
+        "mechanism": "mechanizm",
+        "area2": "drugi obszar",
+        "kind": "rodzaj",
+        "status": "stan",
+        "decided_by": "autor",
+        "confirmed": "potwierdzona",
+        "decided_on": "data decyzji",
+        "review_on": "data przeglądu",
+        "review_condition": "warunek przeglądu",
+        "issues": "tickety",
+        "sources": "źródła",
+        "related": "powiązane",
+        "supersedes": "zastępuje",
+        "superseded_by": "zastąpiona przez",
+        "pending_rollout": "czeka na wdrożenie",
+        "needs_review": "do przejrzenia",
+        "estimated": "szacowane pola"
+      },
+      "queues": {
+        "label": "Kolejki",
+        "confirm": "Do potwierdzenia",
+        "review": "Do przeglądu",
+        "rollout": "Czeka na wdrożenie",
+        "proposed": "Proponowane",
+        "imported": "Do przejrzenia po imporcie",
+        "rollout_info": "Koordynator projektu zobaczy te zmiany w swojej skrzynce (plane-decision inbox), przeniesie je do reguł i kodu, a potem odhaczy."
+      },
+      "actions": {
+        "import-ok": "Przejrzane, zgadza się",
+        "import-fix": "Popraw",
+        "confirm": "Potwierdź",
+        "reviewed": "Przejrzane, zostaje",
+        "change": "Zmień",
+        "defer": "Odłóż",
+        "done": "Wykonana",
+        "revoke": "Wycofaj",
+        "accept": "Przyjmij",
+        "change-accept": "Zmień i przyjmij",
+        "reject": "Odrzuć",
+        "resume": "Wracamy do tego",
+        "postpone": "Przesuń powrót"
+      },
+      "change": {
+        "title": "Nowa treść decyzji",
+        "why_change": "Dlaczego zmieniasz",
+        "why": "Dlaczego",
+        "version": "Nowa decyzja {index}",
+        "remove": "Usuń",
+        "add_version": "+ Dodaj kolejną decyzję (podział)",
+        "save": "Zapisz nową wersję",
+        "save_accept": "Zapisz i przyjmij",
+        "hint": "Nowa wersja obowiązuje od razu. Stara zostaje w łańcuchu zmian jako zastąpiona, a koordynator projektu zobaczy zmianę w swojej skrzynce i przeniesie ją do reguł i kodu.",
+        "hint_split": "Każda nowa decyzja to osobna reguła i obowiązuje od razu. Stara zostaje w łańcuchu zmian jako zastąpiona przez wszystkie nowe, a koordynator projektu zobaczy zmianę w swojej skrzynce.",
+        "hint_accept": "Propozycja zostanie przyjęta w tej treści jako Twoja decyzja i trafi do skrzynki koordynatora projektu."
+      },
+      "dialogs": {
+        "condition": "Warunek (opcjonalnie)",
+        "condition_placeholder": "np. gdy liczba zwrotów przekroczy 20 miesięcznie",
+        "date_or_condition": "Podaj datę albo warunek.",
+        "reason": "Powód (opcjonalnie)",
+        "defer": {
+          "title": "Odłóż {number}",
+          "description": "Decyzja przestaje obowiązywać do daty albo do spełnienia warunku. Koordynator projektu zobaczy to w swojej skrzynce.",
+          "date": "Wracamy do tego",
+          "submit": "Odłóż"
+        },
+        "review": {
+          "title": "Przegląd {number}",
+          "description": "Decyzja zostaje bez zmian. Podaj termin kolejnego przeglądu albo zostaw pola puste, jeśli następny przegląd nie jest potrzebny.",
+          "date": "Kolejny przegląd",
+          "submit": "Zapisz przegląd"
+        },
+        "postpone": {
+          "title": "Przesuń powrót {number}",
+          "description": "Decyzja zostaje odłożona; zmieniasz tylko datę albo warunek powrotu.",
+          "submit": "Zapisz"
+        },
+        "revoke": {
+          "title": "Wycofać {number}?",
+          "description": "Decyzja przestanie obowiązywać i nie będzie niczym zastąpiona. Koordynator projektu zobaczy to w swojej skrzynce.",
+          "submit": "Wycofaj"
+        },
+        "reject": {
+          "title": "Odrzucić propozycję {number}?",
+          "description": "Propozycja nie wejdzie w życie i zostanie w rejestrze jako wycofana.",
+          "submit": "Odrzuć"
+        },
+        "import_fix": {
+          "title": "Popraw {number}",
+          "description": "Popraw dane, które import oszacował albo których nie znał. Po zapisie decyzja zniknie z kolejki „Do przejrzenia po imporcie”.",
+          "author": "Kto zdecydował",
+          "pick_author": "wybierz…",
+          "author_user": "moja decyzja",
+          "author_agent": "agent",
+          "author_required": "Autor jest nieznany: wybierz, kto zdecydował.",
+          "date": "Data decyzji",
+          "status": "Stan",
+          "submit": "Zapisz poprawki"
+        }
+      },
+      "errors": {
+        "title": "Nie udało się zapisać zmiany",
+        "unknown": "Serwer odrzucił zmianę.",
+        "invalid_transition": "Ta akcja nie jest możliwa w obecnym stanie decyzji. Odśwież stronę: ktoś mógł ją właśnie zmienić.",
+        "already_superseded": "Ta decyzja jest już zastąpiona. Zmień jej nową wersję.",
+        "already_confirmed": "Ta decyzja jest już potwierdzona.",
+        "not_needs_review": "Ta decyzja nie czeka już na przejrzenie po imporcie.",
+        "nothing_to_change": "Nie ma czego zmienić.",
+        "validation_error": "Sprawdź pola formularza: któreś ma złą wartość albo jest za długie.",
+        "conflict": "Ktoś zmienił tę decyzję w tej samej chwili. Spróbuj ponownie."
+      },
+      "views": {
+        "areas": "Obszary",
+        "map": "Mapa"
+      },
+      "map": {
+        "count": "{decisions, plural, one {# decyzja} few {# decyzje} many {# decyzji} other {# decyzji}} w {areas, plural, one {# obszarze} other {# obszarach}}",
+        "in_force": "{count} obow.",
+        "legend": {
+          "active": "obowiązuje",
+          "proposed": "proponowana",
+          "deferred": "odłożona",
+          "done": "wykonana",
+          "superseded": "zastąpiona lub wycofana",
+          "attention": "czeka na Ciebie albo na wdrożenie",
+          "supersedes": "zastępuje",
+          "related": "powiązana"
+        },
+        "hint": "Najedź na decyzję, żeby zobaczyć jej powiązania; kliknij, żeby ją otworzyć.",
+        "narrow": "Powiązania widać na szerszym ekranie; kliknij decyzję, żeby ją otworzyć.",
+        "all_lines": "Pokaż wszystkie linie ({count})",
+        "focus_lines": "Pokaż tylko dla wskazanej",
+        "close": "Zamknij"
+      }
     }
   }
 }

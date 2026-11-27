@@ -245,6 +245,277 @@
         "projects": "Could not save the projects.",
         "test": "Could not send a test notification."
       }
+    },
+    "decisions": {
+      "title": "Decisions",
+      "retry": "Try again",
+      "count": "{shown} of {total}",
+      "empty": "No decisions for these filters.",
+      "incomplete": "The list is incomplete: the first {count} decisions were loaded. Narrow it with filters or tell the coordinator.",
+      "unavailable": {
+        "no_access": {
+          "title": "No access",
+          "description": "Project decisions are visible to project admins and members."
+        },
+        "disabled": {
+          "title": "Decisions are not turned on in this project",
+          "description": "A project admin turns them on in the project settings, under Features."
+        },
+        "error": {
+          "title": "Could not load the decisions",
+          "description": "Check the connection and try again."
+        },
+        "open_settings": "Open settings"
+      },
+      "settings": {
+        "title": "Decisions",
+        "description": "The register of decisions the project keeps to: one decision is one rule with a number, a state and a history of changes. Agents record and read them with plane-decision; here you can review and change them.",
+        "toggle_title": "Enable Decisions",
+        "toggle_description": "Shows “Decisions” in the project navigation and opens the register to project admins and members. When turned off, the decisions stay in the database, but nobody reads or changes them.",
+        "open_page": "Go to decisions",
+        "save_error": "Could not save the setting.",
+        "load_error": "Could not load the decision settings."
+      },
+      "tree": {
+        "label": "Areas",
+        "all": "All areas"
+      },
+      "filters": {
+        "status": "State",
+        "kind": "Kind",
+        "all_kinds": "all"
+      },
+      "status_filter": {
+        "current": "in force",
+        "proposed": "proposed",
+        "deferred": "deferred",
+        "done": "done",
+        "past": "superseded and revoked",
+        "all": "all"
+      },
+      "status": {
+        "proposed": "proposed",
+        "active": "in force",
+        "deferred": "deferred",
+        "done": "done",
+        "superseded": "superseded",
+        "revoked": "revoked"
+      },
+      "kinds": {
+        "product": "product",
+        "architecture": "architecture",
+        "process": "way of working",
+        "operations": "operations"
+      },
+      "author": {
+        "user": "owner",
+        "agent": "agent on the owner’s behalf",
+        "unknown": "author unknown"
+      },
+      "search": {
+        "placeholder": "Search decisions…",
+        "too_short": "Type at least {min} characters to search the text; a decision or work item number works at once.",
+        "loading": "Searching…",
+        "has_more": "Showing the newest results; narrow the phrase to see the rest.",
+        "error": "Search is not working; try again in a moment.",
+        "other_states": "{count, plural, one {# more result in other states.} other {# more results in other states.}}",
+        "show_all_states": "Show all"
+      },
+      "groups": {
+        "general": "General",
+        "from_area": "From area: {area}"
+      },
+      "badges": {
+        "confirm": "to confirm",
+        "review": "review",
+        "return": "return",
+        "approx": "approx.",
+        "overdue": "overdue",
+        "rollout": "waiting for rollout",
+        "imported": "imported, to review",
+        "also_area": "also: {area}"
+      },
+      "card": {
+        "estimated": "est.",
+        "date_unknown": "date unknown",
+        "from_area": "from area: {area}",
+        "issue_hidden": "You have no access to this work item",
+        "why": "Why",
+        "rejected": "Rejected",
+        "chain": "Versions of this decision",
+        "split_from": "Split from {from}, together with: {others}.",
+        "related": "Related",
+        "note": "Note",
+        "sources": "Sources",
+        "no_sources": "none",
+        "history": "History",
+        "history_loading": "Loading the history…",
+        "history_error": "Could not load the history.",
+        "yes": "yes",
+        "no": "no"
+      },
+      "channel": {
+        "app": "browser",
+        "api": "terminal"
+      },
+      "events": {
+        "created": "recorded",
+        "proposed": "proposed",
+        "accepted": "accepted",
+        "confirmed": "confirmed",
+        "deferred": "deferred",
+        "resumed": "back from deferral",
+        "done": "done",
+        "revoked": "revoked",
+        "rejected": "proposal rejected",
+        "reviewed": "reviewed, stays",
+        "import_reviewed": "reviewed after import",
+        "edited": "corrected",
+        "linked": "work items or sources added",
+        "superseded": "superseded",
+        "rollout_ack": "rolled out by the coordinator",
+        "imported": "imported"
+      },
+      "fields": {
+        "title": "rule",
+        "rationale": "why",
+        "rejected": "rejected",
+        "note": "note",
+        "area": "area",
+        "mechanism": "mechanism",
+        "area2": "second area",
+        "kind": "kind",
+        "status": "state",
+        "decided_by": "author",
+        "confirmed": "confirmed",
+        "decided_on": "decision date",
+        "review_on": "review date",
+        "review_condition": "review condition",
+        "issues": "work items",
+        "sources": "sources",
+        "related": "related",
+        "supersedes": "supersedes",
+        "superseded_by": "superseded by",
+        "pending_rollout": "waiting for rollout",
+        "needs_review": "to review",
+        "estimated": "estimated fields"
+      },
+      "queues": {
+        "label": "Queues",
+        "confirm": "To confirm",
+        "review": "To review",
+        "rollout": "Waiting for rollout",
+        "proposed": "Proposed",
+        "imported": "To review after import",
+        "rollout_info": "The project coordinator sees these changes in their inbox (plane-decision inbox), carries them into the rules and the code, then checks them off."
+      },
+      "actions": {
+        "import-ok": "Reviewed, correct",
+        "import-fix": "Correct",
+        "confirm": "Confirm",
+        "reviewed": "Reviewed, stays",
+        "change": "Change",
+        "defer": "Defer",
+        "done": "Done",
+        "revoke": "Revoke",
+        "accept": "Accept",
+        "change-accept": "Change and accept",
+        "reject": "Reject",
+        "resume": "Back to it",
+        "postpone": "Move the return"
+      },
+      "change": {
+        "title": "New wording of the decision",
+        "why_change": "Why you change it",
+        "why": "Why",
+        "version": "New decision {index}",
+        "remove": "Remove",
+        "add_version": "+ Add another decision (split)",
+        "save": "Save the new version",
+        "save_accept": "Save and accept",
+        "hint": "The new version is in force at once. The old one stays in the chain of versions as superseded, and the project coordinator sees the change in their inbox and carries it into the rules and the code.",
+        "hint_split": "Each new decision is a rule of its own and in force at once. The old one stays in the chain as superseded by all of them, and the project coordinator sees the change in their inbox.",
+        "hint_accept": "The proposal is accepted in this wording as your decision and goes to the project coordinator's inbox."
+      },
+      "dialogs": {
+        "condition": "Condition (optional)",
+        "condition_placeholder": "e.g. when returns exceed 20 a month",
+        "date_or_condition": "Give a date or a condition.",
+        "reason": "Reason (optional)",
+        "defer": {
+          "title": "Defer {number}",
+          "description": "The decision is not in force until the date or until the condition is met. The project coordinator sees this in their inbox.",
+          "date": "Back to it on",
+          "submit": "Defer"
+        },
+        "review": {
+          "title": "Review {number}",
+          "description": "The decision stays as it is. Give the date of the next review, or leave both fields empty if no further review is needed.",
+          "date": "Next review",
+          "submit": "Save the review"
+        },
+        "postpone": {
+          "title": "Move the return of {number}",
+          "description": "The decision stays deferred; only the date or the condition of its return changes.",
+          "submit": "Save"
+        },
+        "revoke": {
+          "title": "Revoke {number}?",
+          "description": "The decision stops being in force and nothing replaces it. The project coordinator sees this in their inbox.",
+          "submit": "Revoke"
+        },
+        "reject": {
+          "title": "Reject the proposal {number}?",
+          "description": "The proposal does not come into force and stays in the register as revoked.",
+          "submit": "Reject"
+        },
+        "import_fix": {
+          "title": "Correct {number}",
+          "description": "Correct what the import estimated or did not know. Once saved, the decision leaves the queue “To review after import”.",
+          "author": "Who decided",
+          "pick_author": "choose…",
+          "author_user": "my decision",
+          "author_agent": "an agent",
+          "author_required": "The author is unknown: choose who decided.",
+          "date": "Decision date",
+          "status": "State",
+          "submit": "Save the corrections"
+        }
+      },
+      "errors": {
+        "title": "Could not save the change",
+        "unknown": "The server refused the change.",
+        "invalid_transition": "This action is not possible in the current state of the decision. Reload the page: someone may have just changed it.",
+        "already_superseded": "This decision is already superseded. Change its new version instead.",
+        "already_confirmed": "This decision is already confirmed.",
+        "not_needs_review": "This decision no longer waits for a review after import.",
+        "nothing_to_change": "There is nothing to change.",
+        "validation_error": "Check the fields of the form: one has a wrong value or is too long.",
+        "conflict": "Someone changed this decision at the same moment. Try again."
+      },
+      "views": {
+        "areas": "Areas",
+        "map": "Map"
+      },
+      "map": {
+        "count": "{decisions, plural, one {# decision} other {# decisions}} in {areas, plural, one {# area} other {# areas}}",
+        "in_force": "{count} in force",
+        "legend": {
+          "active": "in force",
+          "proposed": "proposed",
+          "deferred": "deferred",
+          "done": "done",
+          "superseded": "superseded or revoked",
+          "attention": "waiting for you or for a rollout",
+          "supersedes": "supersedes",
+          "related": "related"
+        },
+        "hint": "Hover a decision to see its links; click it to open it.",
+        "narrow": "Links show on a wider screen; click a decision to open it.",
+        "all_lines": "Show all lines ({count})",
+        "focus_lines": "Show only for the pointed decision",
+        "close": "Close"
+      }
     }
   }
 }
